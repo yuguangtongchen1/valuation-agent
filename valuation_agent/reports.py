@@ -39,6 +39,24 @@ def money(value, currency="", unit="", record=None):
             f"{base:,.2f} 元{per}；原始读数：{raw}）")
 
 
+def reference_money(row):
+    package = row.get("reference_price_type") == "package_total" or row.get("kind") == "whole_scope_quote"
+    field = "subtotal" if package else "unit_price"
+    value = row.get("reference_total", row.get("subtotal")) if package else row.get("unit_price")
+    record = money_record(row, field)
+    cny = row.get("reference_total_cny_yuan") if package else row.get("unit_price_cny_yuan")
+    if cny is not None:
+        record = {**record, "cny_yuan": cny}
+    return money(value, row.get("currency"), "整包" if package else row.get("reference_rate_unit") or row.get("unit"), record)
+
+
+def variant_label(row):
+    for key in ("quotation_variant_name", "quote_variant_name", "price_variant_label", "source_price_version"):
+        if isinstance(row.get(key), str) and row[key]:
+            return row[key]
+    return ""
+
+
 def assessment(entry, threshold=Decimal("0.15")):
     query = entry["quote"]
     engine = modules()
@@ -52,7 +70,7 @@ def assessment(entry, threshold=Decimal("0.15")):
         past_money = money_record(ref)
         cny_ready = current_money.get("cny_yuan") is not None and past_money.get("cny_yuan") is not None
         differences = [value for value in ref.get("differences", []) if not (cny_ready and value == "币种不同")]
-        if (ref.get("comparison_role") != "candidate" or ref.get("estimation_exclusion")
+        if (ref.get("price_comparison_eligible") is False or ref.get("comparison_role") != "candidate" or ref.get("estimation_exclusion")
                 or differences or ref.get("spec_differences")
                 or not any(term in label for term in ("同型号", "同规格", "参数一致", "型号或规格与组合一致"))):
             continue
@@ -163,13 +181,14 @@ def render(result, threshold=Decimal("0.15")):
             out.append(advice["reason"] + "。")
         else:
             if entry.get("known_item_in_sources") or entry.get("pending_price_sources"):
-                out.append("资料中已有相关名称或待核价格线索；先补原件分项报价与规格，不把无价格记录当作已报价。")
+                out.append("资料中已有相关名称或价格线索；先核对合同范围及是否存在整包报价，未写的分项价格与规格留空。")
             else:
                 out.append("所选资料尚未收录可用参考，或名称与配置未能对应；现有证据不足以区分资料缺失与非标定制。")
-            out.append("建议：补充品牌/型号、材质、尺寸、组合及服务范围；请采购补录原报价或向供应商索取分项报价。")
+            out.append("建议：继续按服务类型、用途、型号、工艺及子件查询；原件未提供分项时保留已知整包范围，仍无参考再补询价。")
         for ref in advice["references"]:
             role = {"component": "部分子件", "package": "整包", "partial": "部分工作", "process": "工艺"}.get(ref.get("comparison_role"), "分项")
-            out.append(f"- {role}参考：{text(ref.get('item_name'))}；{money(ref.get('unit_price'), ref.get('currency'), ref.get('unit'), money_record(ref))}；供应商：{text(ref.get('supplier'))}；项目：{text(ref.get('project'))}。")
+            variant = f"；版本：{text(variant_label(ref))}" if variant_label(ref) else ""
+            out.append(f"- {role}参考：{text(ref.get('item_name'))}；{reference_money(ref)}；供应商：{text(ref.get('supplier'))}；项目：{text(ref.get('project'))}{variant}。")
             if ref.get("comparison_role") == "component":
                 out.append(f"  仅对应当前组合中的 {text(ref.get('component_name'))}，不代表整组报价。")
             differences = list(dict.fromkeys(ref.get("differences", []) + ref.get("spec_differences", [])))

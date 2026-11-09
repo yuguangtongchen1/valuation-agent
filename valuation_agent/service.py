@@ -94,12 +94,7 @@ def compare(document, data=None, history=None, worksheet=None):
     engine, root, rows, ledger, duplicates, shared, catalog, metadata = load_history(data, history, worksheet)
     valuation, workbench = engine["valuation"], engine["workbench"]
     # Association failures and superseded configurations must never be priced references.
-    usable = [r for r in rows if not engine["registry"].association_pending(r)
-              and not (r.get("source_attributes") or {}).get("price_reference_blocked")
-              and r.get("source_price_version") != "变更前" and not r.get("version_exclusive")
-              and r.get("source_document_type") != "cross_project_appendix_quote"
-              and valuation.positive(r.get("unit_price")) and r.get("unit")
-              and (metadata["mode"] == "provided_history" or valuation.is_checked(r) or r.get("source_fields_reviewed"))]
+    usable = workbench.reference_pool(rows, allow_pending=metadata["mode"] == "provided_history")
     pending = workbench.pending_price_index(rows)
     names = workbench.source_name_index(rows)
     source_by_line = {row["line_id"]: row for row in rows}
@@ -131,3 +126,15 @@ def compare(document, data=None, history=None, worksheet=None):
     return {"schema_version": 1, "project": document.get("project", ""),
             "synthetic": document.get("synthetic", False), "history": metadata,
             "engine": "workbench.lookup / relationship / quote_classification", "rows": output}
+
+
+def audit(data):
+    """Validate hub associations using the same loader as comparison, without mutating it."""
+    engine, _, rows, _, _, _, _, metadata = load_history(data=data)
+    pool = engine["workbench"].reference_pool(rows)
+    packages = [row for row in pool if row.get("kind") == "whole_scope_quote"
+                or (not row.get("unit_price") and row.get("subtotal"))]
+    return {"schema_version": 1, "status": "association_checks_passed", "history": metadata,
+            "reference_rows": len(pool), "package_reference_rows": len(packages),
+            "unit_price_reference_rows": len(pool) - len(packages),
+            "note": "验证项目、合同、原件与明细关联；允许未写或未辨字段留空，不代表每项规格都可直接比价。"}

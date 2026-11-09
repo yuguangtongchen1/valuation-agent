@@ -16,7 +16,7 @@ python3 -m venv .venv
 
 演示会生成 `quote.json`、`history.json`、`comparison.json` 和 `report.md`。所有项目、供应商及金额均为合成数据。报告演示同配置参考、材质差异、组合中的部分子件及未找到参考四种情况。
 
-## 六个命令
+## 七个命令
 
 ```sh
 # 1. 生成合成演示
@@ -121,3 +121,11 @@ valuation-agent compare ./quote.json --data /path/to/private-data --out ./compar
 ## 版本维护
 
 安装包使用仓库内 `valuation_agent/_engine/` 的通用引擎快照。公开仓库不包含公司的历史数据。当前通过 GitHub 安装，没有发布到 PyPI；新版可在独立环境中重新安装对应 GitHub 版本。
+
+### 校验私有 Data Hub
+
+```sh
+valuation-agent audit --data ./private-data --out ./audit.json
+```
+
+0.2.0 使用共享匹配引擎，区分整包总额和单项价格，报价版本分别展示、同一采购去重。关联通过不代表所有报价均可直接比较。

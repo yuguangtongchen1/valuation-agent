@@ -1,7 +1,7 @@
 """Internal classification by use, deliverable, and scope for exhibition quotes."""
 import re
 from functools import lru_cache
-from semantic_profile import digital_path
+from semantic_profile import digital_path, procurement_service_path
 from row_classification import row_route
 
 
@@ -118,8 +118,14 @@ def classify_row(row):
     return path or (_routed_path(route,name) if route else ())
 
 
-@lru_cache(maxsize=8192)
+@lru_cache(maxsize=32768)
 def quote_classification(name, context):
+    service = procurement_service_path(name, context)
+    if service:
+        return service
+    digital = digital_path(name, context)
+    if digital and re.search(r'数字(?:多媒体)?内容|多媒体内容', name):
+        return digital
     route = row_route({'item_name':name,'description':context})
     if route and (route.get('priority') or re.search(r'插件|程序开发|软件开发|硬件驱动|框架编程',name)):
         return _routed_path(route,name)
@@ -140,6 +146,12 @@ def quote_classification(name, context):
 def comparable_class(current, historical, name, past):
     if not current or not historical:
         return False
+    if current[0] == historical[0] == '数字内容与技术服务' and '数字内容制作' in (current[1], historical[1]):
+        return True
+    if current[:2] == historical[:2] == ('展览运营服务', '人员运营'):
+        return current == historical or '运营岗位组合' in (current[-1], historical[-1])
+    if current[:2] == historical[:2] == ('多媒体集成服务', '系统建设与采购'):
+        return True
     if current == historical:
         # The generic prop leaf is a filing category, not evidence that two props serve the same function.
         if current[-1] == '独立道具':
@@ -149,7 +161,7 @@ def comparable_class(current, historical, name, past):
 
 
 def bundled_evidence(current, historical):
-    if not current or not historical:
+    if len(current) < 3 or len(historical) < 3:
         return ''
     if historical[2] == '地台整包' and current[2] in ('承重基层', '边缘收口'):
         return f'历史报价合计了地台与包边，未列{current[2]}独立单价'
@@ -172,8 +184,9 @@ PROCESS_TERMS = {
 }
 
 
+@lru_cache(maxsize=32768)
 def process_terms(text):
-    return {label for label, pattern in PROCESS_TERMS.items() if re.search(pattern, text)}
+    return frozenset(label for label, pattern in PROCESS_TERMS.items() if re.search(pattern, text))
 
 
 def process_reference(current, historical, processes, materials, parameters):

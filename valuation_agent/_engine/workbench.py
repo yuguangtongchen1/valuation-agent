@@ -4,6 +4,7 @@ import argparse
 import base64
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 import hashlib
 import json
 from pathlib import Path
@@ -20,7 +21,7 @@ from quote_classification import (billing_unit, bundled_evidence, comparable_cla
 from quote_parameters import parameter_comparison, parameter_text_only, parameters
 from reference_catalog import ReferenceCatalog, template_context
 from semantic_profile import models, actions, classification_trace, scope_text, inspect_input
-from valuation import is_checked, load, norm, positive, reference, rejection
+from valuation import is_checked, load, norm, positive, reference, rejection, price_role_block, view_only_variant
 
 TABLE_URL = os.environ.get('VALUATION_AGENT_FEISHU_TABLE_URL', '')
 GITHUB = os.environ.get('VALUATION_AGENT_SOURCE_BASE_URL', '')
@@ -90,6 +91,7 @@ SCOPE_PARTS = {
     '建模': r'建模|模型制作', '绑定': r'绑定',
     '动画': r'动画', '渲染': r'渲染', '剪辑': r'剪辑', '特效': r'特效',
 }
+@lru_cache(maxsize=32768)
 def light_subtype(name):
     return next((key for key, terms in (
         ('星形灯', ('星星灯', '星形灯', '星型灯')), ('灯带', ('灯带', '灯条')),
@@ -97,23 +99,27 @@ def light_subtype(name):
     ) if any(term in name for term in terms)), '')
 
 
+@lru_cache(maxsize=32768)
 def scope_parts(value):
     included, excluded = set(), set()
     for phrase in re.split(r'[，,；;。+＋]|、(?=含|包含|不含|不包括|另计)', value):
         target = excluded if re.search(r'不含|不包含|不包括|不负责|不提供|不做|无需|另计', phrase) else included
         target.update(part for part, pattern in SCOPE_PARTS.items() if re.search(pattern, phrase))
-    return included - excluded, excluded
+    return frozenset(included - excluded), frozenset(excluded)
 
 
+@lru_cache(maxsize=32768)
 def specification(value):
     return re.sub(r'\s+', '', norm(value)).replace('×', 'x').replace('*', 'x')
 
 
+@lru_cache(maxsize=32768)
 def material_terms(value):
     return {group[0]: next(term for term in group if term in value).replace('pvc', 'PVC').replace('pp背胶', 'PP背胶')
             for group in SPEC_MATERIALS if any(term in value for term in group)}
 
 
+@lru_cache(maxsize=32768)
 def expense_parts(value):
     return {label for label, pattern in (
         ('人工', r'人工|电工|安装|搭建|调试'), ('交通', r'机票|往返|交通'),
@@ -121,8 +127,37 @@ def expense_parts(value):
         ('餐食', r'伙食|餐费|餐饮|食宿|餐住')) if re.search(pattern, value)}
 
 
+def semantic_name(row, name_key):
+    attrs = row.get('source_attributes') or {}
+    return norm(row.get('standard_object_name') or row.get('standard_service_name')
+                or attrs.get('standard_object_name') or attrs.get('standard_service_name')
+                or row.get(name_key))
+
+
 def line_classification(row, name_key, context_keys):
-    return quote_classification(norm(row.get(name_key)), ' '.join(norm(row.get(key)) for key in context_keys))
+    return quote_classification(semantic_name(row, name_key), ' '.join(norm(row.get(key)) for key in context_keys))
+
+
+def reference_pool(rows, allow_pending=False):
+    """Reference retrieval includes source-reviewed package totals, not only unit prices."""
+    pool = []
+    for row in rows:
+        attrs = row.get('source_attributes') or {}
+        if row.get('kind') not in ('bom_line', 'whole_scope_quote'):
+            continue
+        user_pending = allow_pending and row.get('record_status') == 'user_history_pending_review'
+        if not (is_checked(row) or row.get('source_fields_reviewed') or user_pending) or price_role_block(row):
+            continue
+        # Explicit duplicate evidence remains in contract detail, not a new quote sample.
+        if attrs.get('duplicate_quote_reference_only'):
+            continue
+        scoped_out = (row.get('scope_association_pending') or row.get('comparison_eligible') is False)
+        if scoped_out and not view_only_variant(row):
+            continue
+        if ((positive(row.get('unit_price')) and row.get('unit'))
+                or positive(row.get('subtotal'))):
+            pool.append(row)
+    return pool
 
 
 def pending_price_index(rows):
@@ -144,6 +179,18 @@ def source_name_index(rows):
     return index
 
 
+@lru_cache(maxsize=32768)
+def _family_terms(name):
+    return tuple((index, term) for index, group in enumerate(FAMILIES)
+                 for term in group if term in name)
+
+
+@lru_cache(maxsize=32768)
+def _family_match(name, past):
+    return max(((a, b) for ai, a in _family_terms(name) for bi, b in _family_terms(past)
+                if ai == bi), key=lambda pair: len(pair[0]) + len(pair[1]), default=None)
+
+
 def relationship(query, row, catalog_match=None):
     name, past = norm(query['name']), norm(row['item_name'])
     model = norm(query.get('model'))
@@ -159,12 +206,16 @@ def relationship(query, row, catalog_match=None):
     historical = f'{historical_details} {norm(row.get("module"))}'
     current_models = models(' '.join((model, context)))
     historical_models = models(' '.join((past_model, historical_details)))
-    if model:
+    def explicit_model_code(value):
+        return bool(re.search(r'[a-z]', value) and (re.search(r'\d', value) or '-' in value)
+                    and not re.fullmatch(r'p\d+(?:\.\d+)?(?:mm)?', value)
+                    and not re.fullmatch(r'(?:[lwh]\d+(?:mm|cm|m)?[x×*]?)+', value))
+    if explicit_model_code(model):
         current_models.add(model.upper())
-    if past_model:
+    if explicit_model_code(past_model):
         historical_models.add(past_model.upper())
-    current_path = quote_classification(name, context)
-    historical_path = quote_classification(past, f'{historical_details} {norm(row.get("module"))}')
+    current_path = quote_classification(semantic_name(query, 'name'), context)
+    historical_path = quote_classification(semantic_name(row, 'item_name'), f'{historical_details} {norm(row.get("module"))}')
     if (current_path[:2] == ('数字内容与技术服务', '输出适配')
             and re.search(r'策划|制片|导演|项目管理|制作统筹', past)
             and not re.search(r'适配|反求|展开|楼体|多屏', historical_details)):
@@ -175,10 +226,9 @@ def relationship(query, row, catalog_match=None):
     catalog_bridge = bool(catalog_match and not (current_path and historical_path))
     same_model = bool(current_models and historical_models and current_models == historical_models)
     digital_related = bool(current_path and historical_path and current_path[0] == historical_path[0] == '数字内容与技术服务'
-                           and (current_path[1] == historical_path[1] or actions(context) & actions(historical_details)))
+                           and (current_path[1] == historical_path[1] or '数字内容制作' in (current_path[1], historical_path[1]) or actions(context) & actions(historical_details)))
     same_spec = bool(spec and spec == past_spec)
-    family = max(((a, b) for group in FAMILIES for a in group if a in name
-                  for b in group if b in past), key=lambda pair: len(pair[0]) + len(pair[1]), default=None)
+    family = _family_match(name, past)
     near = min(len(name), len(past)) >= 3 and (name in past or past in name)
     current_type, historical_type = light_subtype(name), light_subtype(past)
     if not same_model and current_type and historical_type and current_type != historical_type:
@@ -214,7 +264,7 @@ def relationship(query, row, catalog_match=None):
     elif spec and not past_spec and not same_parameters:
         differences.append('历史规格未注明')
     for parameter in compared:
-        if parameter['current'] and not parameter['historical'] and parameter['label'] in ('屏幕形态', '屏幕尺寸', '像素间距', '刷新率', '内存', '存储'):
+        if parameter['current'] and not parameter['historical'] and parameter['label'] in ('屏幕形态', '屏幕尺寸', '像素间距', '刷新率', '内存', '存储', '帧率', '分辨率等级', '成片时长', '视觉风格'):
             differences.append(f'历史{parameter["label"]}未注明')
         if parameter['different']:
             spec_differences.append(f'{parameter["label"]}不同（当前：{parameter["current"]}；历史：{parameter["historical"]}）')
@@ -224,6 +274,11 @@ def relationship(query, row, catalog_match=None):
                                          materials.keys() & past_materials.keys(), matching_parameters) if separate_classes else ''
     if separate_classes and not (model_bridge or attribute_reason or catalog_bridge or digital_related or labor_partial):
         return None
+    if materials and not past_materials:
+        differences.append('历史材质未注明')
+    missing_processes = current_processes - historical_processes
+    if missing_processes and current_path and historical_path and current_path[:3] == historical_path[:3]:
+        differences.append('历史工艺未注明：' + '、'.join(sorted(missing_processes)))
     material_conflict = bool(materials and past_materials and materials.keys() != past_materials.keys())
     if material_conflict:
         spec_differences.append(f'材质不同（当前：{"+".join(materials.values())}；历史：{"+".join(past_materials.values())}）')
@@ -260,6 +315,8 @@ def relationship(query, row, catalog_match=None):
         count = re.search(r'(三|3|两|2|四|4|五|5)只角色', historical_details)
         if count and not re.search(r'[一二三四五六七八九十0-9]+只角色', context):
             digital_differences.append(f'历史每套含{count[0]}；当前每套角色数未注明')
+    if digital_related and any(p['label'] == '视觉风格' and p['current'] and not p['historical'] for p in compared):
+        digital_differences.append('历史视觉风格未注明，不能确认与当前制作风格相同')
     differences.extend(digital_differences)
     conflict = scope_conflict or bool(spec_differences) or bool(digital_differences)
     if historical_package and not re.search(r'整包|布景|套装',name):
@@ -278,6 +335,9 @@ def relationship(query, row, catalog_match=None):
         differences.append('整包价格与分项单价不可直接比较')
     elif digital_related and digital_differences:
         tier, label, reason = 18, '部分工作参考', '实际交付内容有交集，未覆盖或超出当前工作范围的部分需分别询价'
+    elif class_match and current_path[:2] == ('展览运营服务', '人员运营') and current_path != historical_path:
+        tier, label, reason = 18, '部分岗位参考', '历史仅列具体运营岗位，当前组合中的其他岗位需分别对照'
+        differences.append('运营岗位覆盖范围不同')
     elif class_match and current_path != historical_path:
         tier, label = 6, '同用途参考'
         print_processes = {'UV打印', '写真喷绘'}
@@ -308,7 +368,9 @@ def relationship(query, row, catalog_match=None):
             reason = f'两项均归入{current_path[-1]}，按规格、交付范围和计价口径进一步比较'
         else:
             tier, label = 6, '同用途参考'
-            reason = f'两项均用于{current_path[2]}，具体材料与施工范围需对照'
+            reason = (f'两项均归入{current_path[2]}，制作工序与交付范围需对照'
+                      if current_path[0] == '数字内容与技术服务' or '服务' in current_path[0] else
+                      f'两项均用于{current_path[2]}，具体材料与施工范围需对照')
     elif catalog_bridge:
         identity, catalog_path = catalog_match
         tier, label = 4, '归类库同用途参考'
@@ -371,6 +433,8 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
     catalog_candidates = ({row['line_id']: (label, path) for row, label, path in catalog.candidates(query)}
                           if catalog and not component else {})
     for row in checked:
+        if price_role_block(row):
+            continue
         if row['record_id'] == query.get('exclude') or row['line_id'] in omit:
             continue
         if component:
@@ -404,9 +468,11 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
     seen = set()
     projects = set()
     for row, (_, label, differences, spec_differences, reason, compared, classification) in candidates:
-        key = (row['source_token'], row['source_locator'])
+        attrs = row.get('source_attributes') or {}
+        variant = str(row.get('quotation_variant_id') or attrs.get('quotation_variant_id') or row.get('source_variant_id') or row.get('variant_id') or row.get('source_price_version') or '')
+        key = (row['source_token'], row['source_locator'], variant)
         project = (row['project_key'], norm(row['item_name']), norm(row.get('spec')),
-                   norm(row.get('model')), str(row.get('unit_price')))
+                   norm(row.get('model')), str(row.get('unit_price')), str(row.get('subtotal')), variant)
         if key in seen or project in projects:
             continue
         seen.add(key)
@@ -419,7 +485,18 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
         record = ledger[row['record_id']]
         folder = root / 'attachments' / hashlib.sha256(row['source_token'].encode()).hexdigest()
         source = next(iter(sorted(folder.glob('source.*'))), folder / 'document.xml')
-        if current_unit and billing_unit(norm(row['unit'])) != current_unit:
+        package_total = row.get('kind') == 'whole_scope_quote' or not (positive(row.get('unit_price')) and row.get('unit'))
+        monthly_fee = attrs.get('monthly_fee_cny')
+        if monthly_fee is not None:
+            differences.append('历史单价为每人月费用；整期小计单独保留，未注明月数不反推')
+        if package_total:
+            label = '整包金额参考' if row.get('kind') == 'whole_scope_quote' else '明细金额参考'
+            reason += '。历史仅提供范围金额，不作为当前分项单价或整项高低判断依据'
+            differences.append('整包或明细总额与分项单价不可直接比较')
+        if view_only_variant(row):
+            label += ' · 版本范围待核'
+            differences.append('历史版本或适用范围不同，不计作独立成交样本')
+        if current_unit and row.get('unit') and billing_unit(norm(row['unit'])) != current_unit:
             differences.append('计价单位不同')
             reason += f'。计价单位不同（当前：{query["unit"]}；历史：{row["unit"]}）'
         if query.get('currency') and row['currency'] != query['currency']:
@@ -428,9 +505,17 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
             differences.append('仅材质或工艺相近，装置和范围需另核')
         result.append({**ref, 'contract_name': record['contract_name'], 'sheet': record['sheet'],
                        'ledger_row': record['row'], 'source_name': record['contract_link'],
-                       'match_kind': label, 'differences': differences, 'spec_differences': spec_differences,
+                       'match_kind': label, 'differences': list(dict.fromkeys(differences)), 'spec_differences': list(dict.fromkeys(spec_differences)),
+                       'reference_price_type': 'package_total' if package_total else 'unit_price',
+                       'reference_total': row.get('subtotal'),
+                       'reference_rate_basis': 'monthly_per_person' if monthly_fee is not None else None,
+                       'reference_rate_label': '每人月费用' if monthly_fee is not None else None,
+                       'reference_rate_unit': '人/月' if monthly_fee is not None else None,
+                       'reference_total_cny_yuan': ref.get('subtotal_cny_yuan'),
+                       'independent_sample_key': row.get('economic_purchase_group') or attrs.get('economic_purchase_group') or row.get('purchase_evidence_group') or attrs.get('purchase_evidence_group') or attrs.get('observation_family') or attrs.get('shared_quote_family') or row.get('project_key'),
+                       'price_comparison_eligible': not package_total and not view_only_variant(row) and exclusion is None and not [d for d in differences if d != '币种不同'] and not component,
                        'match_reason': reason, 'parameters': compared,
-                       'comparison_role': 'component' if component else 'package' if '整包旁证' in label else 'process' if '工艺' in label else 'partial' if '部分工作参考' in label else 'candidate',
+                       'comparison_role': 'package' if package_total else 'component' if component else 'package' if '整包旁证' in label else 'process' if '工艺' in label else 'partial' if '部分' in label else 'candidate',
                        'classification': classification,
                        'template_categories': template_context(catalog, row, 'item_name'),
                        'source_url': f'{GITHUB}/attachments/{folder.name}/{source.name}' if GITHUB and source.is_file() else None})
@@ -451,7 +536,8 @@ def lookup(root, checked, ledger, duplicates, shared, query, live, pending=None,
     for component in quoted_components({**query, 'name': name}):
         _, (_, unit) = component
         partials.extend(priced_references(root, checked, ledger, duplicates, shared,
-                       {**query, 'unit': unit}, component=component))
+                       {'name': component[0], 'unit': unit, 'currency': query.get('currency'),
+                        'exclude': query.get('exclude')}, component=component))
     result = priced_references(root, checked, ledger, duplicates, shared, {**query, 'name': name},
                                omit={ref['line_id'] for ref in partials}, catalog=catalog) + partials
     review_candidates = (pending or {}).get((path, billing_unit(norm(query.get('unit')))), {})
@@ -567,13 +653,7 @@ def main():
         return
     root = Path(__file__).resolve().parents[1] / 'data'
     rows, duplicates, shared, _, _ = load(root)
-    checked = [r for r in rows if (is_checked(r) or r.get('source_fields_reviewed'))
-               and not r.get('source_attributes',{}).get('price_reference_blocked')
-               and r['kind'] == 'bom_line'
-               and r.get('source_price_version')!='变更前' and not r.get('version_exclusive')
-               and r.get('source_document_type')!='cross_project_appendix_quote'
-               and not r.get('scope_association_pending') and r.get('comparison_eligible') is not False
-               and positive(r.get('unit_price')) and r.get('unit')]
+    checked = reference_pool(rows)
     if args.action == 'demo':
         output = [reference(row, rejection(row, duplicates, shared)) for name in DEMO_NAMES
                   if (row := next((r for r in checked if is_checked(r) and r['item_name'] == name and r['currency'] == 'CNY'

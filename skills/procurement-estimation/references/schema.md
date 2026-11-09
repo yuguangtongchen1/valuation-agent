@@ -49,7 +49,7 @@ CLI 接受对象数组，或含 `rows`（也接受 `items`/`lines`）数组的�
 |`configuration`|组合、附件及每套组成|
 |`scope`|设备供货/租赁/安装/制作工序等具体交付范围|
 |`quantity`、`unit`|计价数量与单位；人数/天数/每工时长另保留原字段|
-|`unit_price`、`subtotal`|原件明确单价和金额，不从整包倒推|
+|`unit_price`、`subtotal`|原件明确单价和金额；明确同一对象的数量及总额且经授权可推算单价，需标记计算值|
 |`currency`|原币，例如CNY/HKD/USD/SGD；未写不猜|
 |`supplier`、`project`|原供应商和项目；不得凭上下文虚构|
 |`record_id`、`line_id`、`project_key`|原系统关联ID；缺少时CLI生成技术ID，不代表新项目证据|

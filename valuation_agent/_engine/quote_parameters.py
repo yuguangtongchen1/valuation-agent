@@ -1,5 +1,6 @@
 """Normalize comparable parameters while keeping the source wording for display."""
 from decimal import Decimal
+from functools import lru_cache
 import re
 
 NUMBER = r'\d+(?:\.\d+)?'
@@ -25,6 +26,12 @@ ELECTRICAL_UNITS = {
 
 
 def parameters(value, default_dimension_unit=''):
+    # Return independent dictionaries: current-query merging must not mutate a cache entry.
+    return {label: dict(entries) for label, entries in _parameter_values(value, default_dimension_unit)}
+
+
+@lru_cache(maxsize=32768)
+def _parameter_values(value, default_dimension_unit=''):
     output = {}
     # An explicit unit at the end of an axis chain applies to the other axes in that chain.
     for phrase in re.split(r'[，,；;。\n]', value):
@@ -57,7 +64,7 @@ def parameters(value, default_dimension_unit=''):
     technical = (
         ('屏幕尺寸', rf'({NUMBER})\s*(?:英寸|寸|inch)', '寸'),
         ('刷新率', rf'({NUMBER})\s*hz', 'Hz'),
-        ('像素间距', rf'(?:像素间距|点间距|点距)\s*[:：]?\s*({NUMBER})\s*mm', 'mm'),
+        ('像素间距', rf'(?:(?:像素间距|点间距|点距)\s*[:：]?\s*|(?<![a-z0-9])p)({NUMBER})\s*(?:mm)?', 'mm'),
         ('防护等级', r'ip\s*(\d{2})', 'IP'),
         ('帧率', rf'({NUMBER})\s*(?:fps|帧[/／]秒)', 'fps'),
         ('分辨率等级', r'(?<![a-z0-9])(2|4|8)\s*k(?![a-z])', 'K'),
@@ -66,6 +73,12 @@ def parameters(value, default_dimension_unit=''):
         for match in re.finditer(pattern, value):
             number = Decimal(match[1])
             output.setdefault(label, {})[number] = f'{match[1]} {unit}'
+    for match in re.finditer(rf'({NUMBER})\s*(秒|分钟|min(?:ute)?s?|seconds?|secs?)', value):
+        factor = 60 if match[2] in ('分钟', 'min', 'mins', 'minute', 'minutes') else 1
+        output.setdefault('成片时长', {})[Decimal(match[1]) * factor] = f'{Decimal(match[1]) * factor} 秒'
+    for label, pattern in {'三渲二':r'三渲二|3d转2d', '写实':r'写实', '卡通':r'卡通|cartoon'}.items():
+        if re.search(pattern, value):
+            output.setdefault('视觉风格', {})[label] = label
     for match in re.finditer(rf'({NUMBER})\s*gb\s*[+＋/]\s*({NUMBER})\s*gb', value):
         output.setdefault('内存', {})[Decimal(match[1])] = f'{match[1]} GB'
         output.setdefault('存储', {})[Decimal(match[2])] = f'{match[2]} GB'
@@ -74,7 +87,7 @@ def parameters(value, default_dimension_unit=''):
     for label, pattern in forms.items():
         if re.search(pattern, value):
             output.setdefault('屏幕形态', {})[label] = label
-    return output
+    return tuple((label, tuple(values.items())) for label, values in output.items())
 
 
 def parameter_comparison(current, historical):

@@ -127,6 +127,15 @@ def row_route(row):
     name=str(row.get('item_name') or '').strip()
     detail=' '.join(str(row.get(k) or '') for k in ('spec','description'))
     module=str(row.get('module') or row.get('work_package') or '')
+    # The deliverable is explicit here. Projection is a playback context, not
+    # proof of a projector purchase, when the item itself is digital content.
+    if re.match(r'^数字(?:内容|模型)[（(]', name):
+        post = bool(re.search(r'剪辑|调色|合成', detail))
+        leaf = ('数字内容制作', '剪辑与画面制作' if post else
+                '虚拟模型与动画' if name.startswith('数字模型') else '内容制作；工序未细列')
+        return {'code':'4.4' if post else '4.3', 'leaf':leaf,
+                'evidence_field':'item_name', 'evidence_text':name,
+                'method':'explicit_digital_deliverable_not_playback_hardware', 'priority':True}
     if re.search(r'灯光.*设计.*编程|水舞设计',name):
         return {'code':'1.2','leaf':('演艺技术服务','灯光或水舞设计编程'),'evidence_field':'item_name','evidence_text':name,'method':'explicit_service_operation','priority':True}
     if re.search(r'二维码.*快递',name):

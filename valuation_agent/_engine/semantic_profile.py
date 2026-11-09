@@ -1,5 +1,6 @@
 """Evidence-first internal identities; HS reasoning adapted without claiming tariff codes."""
 import re
+from functools import lru_cache
 import unicodedata
 
 
@@ -25,6 +26,7 @@ DIGITAL = (
 )
 
 
+@lru_cache(maxsize=32768)
 def digital_path(name, context):
     name, context = text(name), text(context)
     hardware = r'服务器|适配器|转接器|多屏宝|多屏保|分配器|显卡|网卡|电脑主机|视频处理器'
@@ -35,6 +37,8 @@ def digital_path(name, context):
         moving = re.search(r'动态|动画|视频', name) or re.search(r'ai\s*(?:视频|动态画面)|视频动态', context)
         leaf = '生成与三维控制' if re.search(r'3d.*控制|三维.*控制', context) else '动态生成' if moving else '静态视觉资产'
         return ('数字内容与技术服务', 'AI内容', leaf)
+    if re.search(r'(?:产品|商品|模型|资产).*(?:适配|改模)', name):
+        return ('数字内容与技术服务', '资产适配', '产品模型与资产适配')
     if re.search(r'适配|展开反求|反求处理', name):
         return ('数字内容与技术服务', '输出适配', '多屏多楼层')
     # The line description refines merged/generic headers; never borrow contract-wide prose here.
@@ -48,17 +52,53 @@ def digital_path(name, context):
             continue
         if re.search(pattern, context):
             return ('数字内容与技术服务', *leaf.split('/'))
+    if re.search(r'数字(?:多媒体)?内容|多媒体内容', name):
+        return ('数字内容与技术服务', '数字内容制作', '工序未细列')
+    return ()
+
+
+@lru_cache(maxsize=32768)
+def procurement_service_path(name, context=''):
+    """Resolve reusable deliverables, keeping campaign names out of class identity."""
+    name, context = text(name), text(context)
+    if re.search(r'(?:内容管理|媒体播放|播放端|播控).*(?:软件|程序|系统|授权)|(?:软件|程序).*(?:播放端|内容管理|播放管理)', name):
+        return ('软件与交互服务', '内容管理与播放', '软件及许可交付')
+    if re.search(r'(?:公司|企业|经营)运营|企业管理', name):
+        return ('管理费用', '企业运营管理', '管理费')
+    if re.search(r'运营服务|运营管理|(?:前台|衍生品).*(?:运营|管理)|(?:展览|展厅).*(?:运营|接待)', name):
+        role = ('前台运营' if '前台' in name and '衍生品' not in name else
+                '衍生品运营' if '衍生品' in name and '前台' not in name else '运营岗位组合')
+        return ('展览运营服务', '人员运营', role)
+    if re.search(r'(?:视频|照片|素材|作品).*拍摄|拍摄(?:服务|制作)', name) and not re.search(r'器材|摄像机|摄影机|镜头|灯具', name):
+        return ('影像制作服务', '拍摄服务', '素材拍摄' if re.search(r'素材|源文件', name + ' ' + context) else '摄制整包')
+    # An integrator's package is not a reference for every device mentioned in it.
+    if re.search(r'(?:多媒体|音视频|影音).*(?:建设|集成|工程|采购)', name):
+        return ('多媒体集成服务', '系统建设与采购', '整项范围')
+    if re.search(r'(?:展厅|展馆|楼层).*(?:硬件|软件)', name):
+        return ('多媒体集成服务', '系统建设与采购',
+                '软件工作包' if '软件' in name and '硬件' not in name else
+                '硬件工作包' if '硬件' in name and '软件' not in name else '整项范围')
+    if re.search(r'扩声(?:系统|设备)?|音响系统|音频系统', name):
+        if re.search(r'租赁|租用', name):
+            return ('音视频设备服务', '扩声系统', '租赁整包')
+        return ('音视频设备服务', '扩声系统', '系统整包')
     return ()
 
 
 def models(value):
-    value = text(value)
+    return set(_models(text(value)))
+
+
+@lru_cache(maxsize=32768)
+def _models(value):
     result = set()
     # Explicit mixed alphanumeric identifiers; dimensions, RAM and resolution are parameters.
     for token in re.findall(r'(?<![a-z0-9])[a-z][a-z0-9]*(?:[-_][a-z0-9]+)+(?![a-z0-9])|(?<![a-z0-9])[a-z]{1,8}\d{2,}[a-z0-9]*(?![a-z0-9])', value):
-        if re.search(r'\d', token) and not re.fullmatch(r'(?:[lwh]\d+|\d+k|\d+gb)', token):
+        if re.fullmatch(r'(?:[lwh]\d+(?:mm|cm|m)?[x×*]?)+', token):
+            continue
+        if re.search(r'\d', token) and not re.fullmatch(r'(?:[lwh]\d+(?:mm|cm|m)?|\d+k|\d+gb)', token):
             result.add(token.upper())
-    return result
+    return frozenset(result)
 
 
 ACTIONS = {
@@ -71,8 +111,9 @@ ACTIONS = {
 }
 
 
+@lru_cache(maxsize=32768)
 def actions(value):
-    return {label for label, pattern in ACTIONS.items() if re.search(pattern, text(value))}
+    return frozenset(label for label, pattern in ACTIONS.items() if re.search(pattern, text(value)))
 
 
 def classification_trace(current, historical, reason, scope_status):

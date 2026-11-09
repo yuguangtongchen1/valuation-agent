@@ -2,6 +2,7 @@
 import argparse
 from collections import Counter, defaultdict
 from decimal import Decimal
+from functools import lru_cache
 import json
 from pathlib import Path
 from statistics import median
@@ -17,8 +18,13 @@ CHECKED_PACKAGE = 'whole_scope_source_checked'
 QUERY_FIELDS = ('item_name', 'brand', 'model', 'spec', 'unit', 'currency', 'agreement_type', 'scope')
 
 
+@lru_cache(maxsize=65536)
+def _normalized(value):
+    return ' '.join(unicodedata.normalize('NFKC', value).casefold().split())
+
+
 def norm(value):
-    return ' '.join(unicodedata.normalize('NFKC', str(value or '')).casefold().split())
+    return _normalized(str(value or ''))
 
 
 def load(root):
@@ -103,7 +109,41 @@ def count_estimate_groups(rows):
                for projects in groups.values())
 
 
+def price_role_block(row):
+    """Exclude financial/conditional observations, independently of review completion."""
+    attrs = row.get('source_attributes') or {}
+    for values in (row, attrs):
+        if any(values.get(flag) is True for flag in (
+                'exclude_from_procurement_price_comparison', 'price_reference_blocked',
+                'explicit_non_market_rate', 'user_confirmed_no_charge')):
+            return 'non_procurement_or_conditional_price'
+    roles = ' '.join(str(values.get(key) or '').lower()
+                     for values in (row, attrs)
+                     for key in ('source_document_type', 'amount_role', 'price_role',
+                                 'price_basis', 'source_payment_basis'))
+    if any(word in roles for word in ('revenue', 'settlement_share', 'balance_payment',
+                                      'payment_balance', 'framework_ledger', 'unpriced_framework', 'scope_reduction', 'change_reduction')):
+        return 'non_procurement_or_conditional_price'
+    if row.get('valuation_eligible') is False and not attrs.get('duplicate_quote_reference_only') and not view_only_variant(row):
+        return 'valuation_explicitly_excluded'
+    return None
+
+
+def view_only_variant(row):
+    attrs = row.get('source_attributes') or {}
+    return bool(row.get('source_document_type') == 'cross_project_appendix_quote'
+                or row.get('source_price_version') == '变更前'
+                or row.get('version_exclusive')
+                or any(values.get(key) for values in (row, attrs)
+                       for key in ('source_city_version_conflict', 'source_version_conflict',
+                                   'price_variant_scope', 'variant_scope_pending')))
+
+
 def rejection(row, duplicate_records, shared_tokens):
+    if price_role_block(row):
+        return price_role_block(row)
+    if view_only_variant(row):
+        return 'price_variant_scope_reference_only'
     if association_pending(row):
         return 'scope_association_pending'
     if row['kind'] != 'bom_line':
@@ -137,8 +177,19 @@ def reference(row, excluded):
         'parent_item_name', 'parent_line_id', 'source_fields_reviewed', 'source_document_type',
         'confirmed_rate_to_cny', 'finance_conversion_evidence', 'finance_conversion_status', 'finance_conversion_pending_reason',
         'source_role', 'source_cell', 'source_table', 'source_chain', 'source_image_sha256',
-        'source_original_path', 'scope_association_pending', 'association_status', 'comparison_eligible'
+        'source_original_path', 'scope_association_pending', 'association_status', 'comparison_eligible',
+        'valuation_eligible', 'standard_object_name', 'source_columns', 'amount_role', 'amount_source',
+        'price_basis', 'source_variant_id', 'price_variant_scope', 'variant_id', 'version_exclusive',
+        'quotation_variant_id', 'quotation_variant_name', 'parent_quote_variant',
+        'economic_purchase_group', 'purchase_evidence_group',
+        'source_scope', 'source_project_context', 'pricing_relationship',
+        'exclude_from_procurement_price_comparison'
     )}
+    attrs = row.get('source_attributes') or {}
+    for field in ('quotation_variant_id', 'quotation_variant_name', 'parent_quote_variant',
+                  'economic_purchase_group', 'purchase_evidence_group'):
+        if result.get(field) is None and attrs.get(field) is not None:
+            result[field] = attrs[field]
     return normalize_money_fields({**result, 'scope': scope(row), 'estimation_exclusion': excluded}, metadata={'amount_unit':'元'})
 
 

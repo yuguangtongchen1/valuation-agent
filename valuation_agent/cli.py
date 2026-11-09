@@ -9,7 +9,7 @@ from . import __version__
 from .demo import run as demo
 from .io import read_input, write_json
 from .reports import render
-from .service import classify, compare, search
+from .service import audit, classify, compare, search
 
 
 def main(argv=None):
@@ -18,6 +18,9 @@ def main(argv=None):
     commands = parser.add_subparsers(dest="command", required=True)
     sample = commands.add_parser("demo", help="生成完全合成的输入、比价结果和建议")
     sample.add_argument("--output-dir", type=Path, default=Path("valuation-demo"))
+    check = commands.add_parser("audit", help="只读校验 Data Hub 的项目、合同、原件与报价关联")
+    check.add_argument("--data", type=Path, required=True)
+    check.add_argument("--out", type=Path)
     for name in ("import", "classify", "compare"):
         command = commands.add_parser(name, help={"import": "归一 JSON/CSV/XLSX，保留原字段", "classify": "按现有多级归类引擎分类", "compare": "拆解型号、规格和组合并检索历史"}[name])
         command.add_argument("input", type=Path)
@@ -44,6 +47,8 @@ def main(argv=None):
     try:
         if args.command == "demo":
             result = demo(args.output_dir)
+        elif args.command == "audit":
+            result = audit(args.data)
         elif args.command == "import":
             result = read_input(args.input, args.worksheet)
         elif args.command == "classify":
