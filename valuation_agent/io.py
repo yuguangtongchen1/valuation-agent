@@ -111,6 +111,18 @@ def read_input(path, worksheet=None):
             if headers is None:
                 raise ValueError("CSV 为空")
             rows = table_rows(headers, reader)
+    elif suffix == ".xls":
+        book = modules()["legacy"].legacy_xls_document(path.read_bytes())
+        candidates = [s for s in book['sheets'] if not worksheet or s['name'] == worksheet]
+        if not candidates:
+            raise ValueError("不存在指定工作表：" + str(worksheet))
+        if not worksheet and len(candidates) != 1:
+            raise ValueError("XLS 有多个工作表，请用 --worksheet 指定，避免漏读")
+        sheet = candidates[0]
+        if not sheet['rows']:
+            raise ValueError("工作表为空")
+        rows = table_rows(sheet['rows'][0]['values'], (r['values'] for r in sheet['rows'][1:]))
+        metadata['worksheet'] = sheet['name']
     elif suffix == ".xlsx":
         try:
             import openpyxl
@@ -132,7 +144,7 @@ def read_input(path, worksheet=None):
         finally:
             book.close()
     else:
-        raise ValueError("支持 JSON、CSV、XLSX；PDF/图片/非标准合同请先由 Skill 逐表识别并归一为 JSON，保留原表头和证据位置")
+        raise ValueError("支持 JSON、CSV、XLSX、XLS；PDF/图片/非标准合同请先由 Skill 逐表识别并归一为 JSON，保留原表头和证据位置")
     if not rows:
         raise ValueError("输入没有明细行")
     if not all(isinstance(row, dict) for row in rows):
@@ -169,11 +181,12 @@ def read_input(path, worksheet=None):
         row["currency"] = row["currency"] or str(metadata.get("currency", ""))
         row.setdefault("row_id", f"row-{index}")
         row.setdefault("source_token", f"local-sha256:{digest}")
-        row.setdefault("source_locator", f"{path.name}:row {original.get('_input_row', index)}")
+        source_sheet = f":sheet {metadata['worksheet']}" if metadata.get('worksheet') else ''
+        row.setdefault("source_locator", f"{path.name}{source_sheet}:row {original.get('_input_row', index)}")
         row.setdefault("source_original_fields", original.get("source_original_fields", original))
         row.setdefault("source_evidence", {"file": path.name, "sha256": digest, "locator": row["source_locator"]})
         row = modules()["money"].normalize_money_fields(row, metadata)
         normalized.append(row)
     return {"schema_version": 1, "project": metadata.get("project", ""), "currency": metadata.get("currency", ""),
-            "source_file": path.name, "source_sha256": digest, "synthetic": metadata.get("synthetic", False),
+            "source_file": path.name, "source_sha256": digest, "worksheet": metadata.get('worksheet'), "synthetic": metadata.get("synthetic", False),
             "rows": normalized}

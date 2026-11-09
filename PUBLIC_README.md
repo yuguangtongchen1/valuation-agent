@@ -10,7 +10,7 @@ Python 3.9 或以上。建议使用独立环境：
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install git+https://github.com/yuguangtongchen1/valuation-agent.git
+.venv/bin/python -m pip install --upgrade 'valuation-agent[excel] @ git+https://github.com/yuguangtongchen1/valuation-agent.git'
 .venv/bin/valuation-agent demo --output-dir ./demo-output
 ```
 
@@ -46,14 +46,14 @@ valuation-agent report ./comparison.json --out ./advice.md
 
 ## 输入格式
 
-支持 JSON、UTF-8 CSV；安装可选依赖后支持 XLSX：
+支持 JSON、UTF-8 CSV；安装可选依赖后支持 XLSX / XLS：
 
 ```sh
 python3 -m pip install "valuation-agent[excel] @ git+https://github.com/yuguangtongchen1/valuation-agent.git"
 valuation-agent import ./quotation.xlsx --worksheet 报价 --out ./quote.json
 ```
 
-XLSX 多工作表时必须明确选表；读取公式的已有缓存值，不执行公式。一个 JSON 对象表示一个真实清单行；整项报价保留为一条，不捏造子件价格。数量、单位、单价、金额分列，不从总价倒推单价。字段缺失保留为空。
+Excel 多工作表时必须明确选表；读取公式的已有缓存值，不执行公式。一个 JSON 对象表示一个真实清单行；整项报价保留为一条，不捏造子件价格。数量、单位、单价、金额分列，不把整包总额分摊成虚构子件单价。字段缺失保留为空。用户明确授权且同一报价项的数量与金额对应时，可计算单价并标为计算值，不能冒充原件单价。
 
 ```json
 {
@@ -135,3 +135,5 @@ valuation-agent audit --data ./private-data --out ./audit.json
 0.2.1 修复整包人民币展示缺口：支持同一完整服务与已确认人民币台账的精确总额关联，原币种未知仍保留未知；不会把总额分配给其他子项。`audit` 新增人民币展示覆盖检查。
 
 0.2.2 改善同型号候选保留、组合/子件范围与源行去重；默认仅比价表和Excel，优化右侧参考与手机布局。
+
+0.2.3 修复报价刷新/前进恢复、重复文件重开、失败重试和文件错误提示；本机工作台直接读取旧版XLS，保留缓存数值及合并表头。投影机整机不再以吊架、改色或镜头服务充当设备价格。

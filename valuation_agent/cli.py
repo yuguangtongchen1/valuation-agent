@@ -22,14 +22,14 @@ def main(argv=None):
     check.add_argument("--data", type=Path, required=True)
     check.add_argument("--out", type=Path)
     for name in ("import", "classify", "compare"):
-        command = commands.add_parser(name, help={"import": "归一 JSON/CSV/XLSX，保留原字段", "classify": "按现有多级归类引擎分类", "compare": "拆解型号、规格和组合并检索历史"}[name])
+        command = commands.add_parser(name, help={"import": "归一 JSON/CSV/XLSX/XLS，保留原字段", "classify": "按现有多级归类引擎分类", "compare": "拆解型号、规格和组合并检索历史"}[name])
         command.add_argument("input", type=Path)
-        command.add_argument("--worksheet", help="XLSX 工作表名；多表时必须指定")
+        command.add_argument("--worksheet", help="Excel 工作表名；多表时必须指定")
         command.add_argument("--out", type=Path)
         if name == "compare":
             sources = command.add_mutually_exclusive_group(required=True)
             sources.add_argument("--data", type=Path, help="经校验的私有 Data Hub 目录")
-            sources.add_argument("--history", type=Path, help="用户提供的历史 JSON/CSV/XLSX")
+            sources.add_argument("--history", type=Path, help="用户提供的历史 JSON/CSV/XLSX/XLS")
             command.add_argument("--history-worksheet")
     lookup = commands.add_parser("search", help="查询所选历史资料，含待核项并标注状态")
     lookup.add_argument("phrase")

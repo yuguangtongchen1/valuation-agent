@@ -16,7 +16,7 @@ from urllib.parse import parse_qs, urlparse
 from zipfile import ZipFile
 
 from estimate import call, column
-from quote_classification import (billing_unit, bundled_evidence, comparable_class, process_reference,
+from quote_classification import (billing_unit, bundled_evidence, comparable_class, process_reference, projection_purchase_role,
                                   process_terms, quote_classification)
 from quote_parameters import parameter_comparison, parameter_text_only, parameters, normalize_specification_text
 from reference_catalog import ReferenceCatalog, template_context
@@ -198,6 +198,9 @@ def _family_match(name, past):
 
 def relationship(query, row, catalog_match=None):
     name, past = norm(query['name']), norm(row['item_name'])
+    current_projection_role, historical_projection_role = projection_purchase_role(name), projection_purchase_role(past)
+    if current_projection_role and historical_projection_role and current_projection_role != historical_projection_role:
+        return None
     model = norm(query.get('model'))
     past_model = norm(row.get('model'))
     spec, past_spec = specification(query.get('spec')), specification(row.get('spec'))
@@ -710,10 +713,18 @@ def oa_file(link, worksheet=''):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('action', choices=('demo', 'lookup', 'contract', 'batch', 'oa'))
+    p.add_argument('action', choices=('demo', 'lookup', 'contract', 'batch', 'oa', 'legacy-xls'))
     for key in ('quantity', 'name', 'exclude', 'unit', 'currency', 'spec', 'dimension_unit', 'model', 'description', 'configuration', 'link', 'worksheet'):
         p.add_argument(f'--{key}', default='')
     args = p.parse_args()
+    if args.action == 'legacy-xls':
+        from legacy_xls import legacy_xls_document
+        try:
+            output = legacy_xls_document(sys.stdin.buffer.read(30 * 1024 * 1024 + 1))
+        except ValueError as error:
+            output = {'error':str(error)}
+        print(json.dumps(output, ensure_ascii=False, allow_nan=False))
+        return
     if args.action == 'oa':
         try:
             print(json.dumps(oa_file(args.link, args.worksheet), ensure_ascii=False))

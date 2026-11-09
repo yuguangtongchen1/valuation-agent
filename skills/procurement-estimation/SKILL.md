@@ -32,7 +32,7 @@ python3 -m venv .venv
 - 数量、单位、单价、小计、日数、每套组成及包价分别保留。先确认实际计算式，不能把所有表都套成“数量×单价”。
 - 归类模板仅是类目和字段规范；模板零值、示例报价及新测试单不进入历史成交库。
 
-标准 CSV/JSON，或已明确选表和表头的 XLSX，可直接导入：
+标准 CSV/JSON，或已明确选表和表头的 XLSX / XLS，可直接导入：
 
 ```sh
 valuation-agent import ./quote.json --out ./normalized.json
@@ -40,7 +40,7 @@ valuation-agent import ./quotation.xlsx --worksheet 报价 --out ./normalized.js
 valuation-agent classify ./normalized.json --out ./classified.json
 ```
 
-CLI 读取 XLSX 公式的已有缓存值，不执行公式；多表逐张明确选择后由模型关联。非标资料先理解并生成 JSON，再导入，不声称 CLI 能直接识别所有合同。
+CLI 读取 Excel 公式的已有缓存值，不执行公式；多表逐张明确选择后由模型关联。非标资料先理解并生成 JSON，再导入，不声称 CLI 能直接识别所有合同。
 
 ## 检索与复核
 
@@ -49,7 +49,7 @@ valuation-agent search '型号或物料 规格' --history ./history.json --limit
 valuation-agent compare ./normalized.json --history ./history.json --out ./comparison.json
 ```
 
-历史 XLSX 可用 `compare --history-worksheet 表名`，`search --worksheet 表名`。已有完整兼容 Data Hub 时将 `--history ./history.json` 换为 `--data ./private-data`；二者互斥，`--data` 不是任意 JSON 文件夹。连接飞书等来源须用当前可用的授权连接器，只读获取后再归一；本地缓存查询不能说成实时遍历了飞书。
+历史 Excel 可用 `compare --history-worksheet 表名`，`search --worksheet 表名`。已有完整兼容 Data Hub 时将 `--history ./history.json` 换为 `--data ./private-data`；二者互斥，`--data` 不是任意 JSON 文件夹。连接飞书等来源须用当前可用的授权连接器，只读获取后再归一；本地缓存查询不能说成实时遍历了飞书。
 
 对整张新报价逐行检查结果，不能第一次名称未命中就结束。先用途和实际功能→同层技术细类→型号、材质、尺寸、工艺和组合→交付与计费范围；再扩展相似对象、明确子件及工艺线索。名称别名帮助召回，不证明同物同价。用模型阅读原描述、候选规格和排除条件，对缺召回继续分解工艺/配置关键词检索，但不把无关候选凑成参考。
 

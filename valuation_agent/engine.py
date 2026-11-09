@@ -9,7 +9,7 @@ import sys
 ENGINE_FILES = (
     "workbench.py", "valuation.py", "estimate.py", "quote_classification.py",
     "quote_parameters.py", "semantic_profile.py", "reference_catalog.py", "row_classification.py",
-    "source_registry.py", "money_units.py", "taxonomy_schema.py", "finance_view.py",
+    "source_registry.py", "money_units.py", "taxonomy_schema.py", "finance_view.py", "legacy_xls.py",
 )
 
 
@@ -48,4 +48,5 @@ def modules():
         "catalog": importlib.import_module("reference_catalog"),
         "registry": importlib.import_module("source_registry"),
         "money": importlib.import_module("money_units"),
+        "legacy": importlib.import_module("legacy_xls"),
     }

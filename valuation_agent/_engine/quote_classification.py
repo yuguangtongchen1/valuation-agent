@@ -150,6 +150,19 @@ def quote_classification(name, context):
     return _routed_path(route,name) if route else ()
 
 
+def projection_purchase_role(name):
+    """The compatible projector model is not the identity of its mount/service."""
+    name = str(name or '').lower()
+    if not re.search(r'投影机|投影仪|projector', name):
+        return None
+    if re.search(r'改色|喷漆|维修|维护|保养|调试|校准|安装|拆除|遮罩服务|\b(?:repaint|repair|maintenance|calibration|installation)\b', name) and not re.search(r'采购|供货|含安装', name):
+        return 'service'
+    for role, pattern in (('mount',r'吊架|支架|吊杆|底座|\b(?:mount|bracket|hanger|stand)\b'),('lens',r'镜头|\blens\b'),('cover',r'遮罩|罩壳|\b(?:cover|mask|housing)\b'),('consumable',r'材料|耗材|滤网|灯泡|\b(?:consumable|filter|lamp|bulb)\b')):
+        if re.search(pattern, name) and not re.search(r'(?:投影机|投影仪|projector)\s*(?:及|和|含|\+|with\b|and\b)',name):
+            return role
+    return 'device'
+
+
 def comparable_class(current, historical, name, past):
     if not current or not historical:
         return False

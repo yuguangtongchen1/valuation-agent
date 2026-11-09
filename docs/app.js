@@ -1,5 +1,5 @@
 'use strict';
-const installation = 'python3 -m pip install --upgrade git+https://github.com/yuguangtongchen1/valuation-agent.git';
+const installation = "python3 -m pip install --upgrade 'valuation-agent[excel] @ git+https://github.com/yuguangtongchen1/valuation-agent.git'";
 const codexPrompt = `请帮我安装并使用「估价 Agent」。
 
 先读取公开仓库 https://github.com/yuguangtongchen1/valuation-agent 的 README，以及 skills/procurement-estimation/SKILL.md，按当前说明安装 CLI 和 Skill。先运行 valuation-agent demo，确认合成演示可用。
