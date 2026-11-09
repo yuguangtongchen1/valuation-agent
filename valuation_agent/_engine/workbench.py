@@ -155,7 +155,7 @@ def reference_pool(rows, allow_pending=False):
         if scoped_out and not view_only_variant(row):
             continue
         if ((positive(row.get('unit_price')) and row.get('unit'))
-                or positive(row.get('subtotal'))):
+                or positive(row.get('subtotal')) or positive(row.get('subtotal_finance_cny_yuan'))):
             pool.append(row)
     return pool
 

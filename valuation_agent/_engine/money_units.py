@@ -70,9 +70,10 @@ def normalize_money(value, currency=None, amount_unit=None, confirmed_rate_to_cn
     """
     if isinstance(value, dict) and value.get('schema') == SCHEMA:
         prior = value
-        return normalize_money(prior.get('raw_value'), prior.get('raw_currency'), prior.get('raw_unit'),
+        item = normalize_money(prior.get('raw_value'), prior.get('raw_currency'), prior.get('raw_unit'),
                                prior.get('confirmed_rate_to_cny'), prior.get('source_evidence'),
                                prior.get('finance_conversion_evidence'))
+        return _associate_ledger_total(item, prior.get('ledger_cny_yuan'), prior.get('ledger_cny_evidence'))
     raw_value = str(value) if isinstance(value, Decimal) else value
     result = {'schema': SCHEMA, 'raw_value': raw_value, 'raw_unit': amount_unit,
               'raw_currency': currency, 'base_amount': None, 'base_unit': '元',
@@ -133,6 +134,47 @@ def normalize_money(value, currency=None, amount_unit=None, confirmed_rate_to_cn
     return result
 
 
+def _associate_ledger_total(item, amount, proof, owner=None):
+    """A verified CNY whole-scope association is not an exchange-rate operation."""
+    if not isinstance(proof, dict) or amount is None:
+        return item
+    required = (proof.get('basis') == 'user_finance_confirmed_contract_mapping'
+                and proof.get('mapping_kind') == 'linked_whole_scope_ledger_total'
+                and proof.get('source_validation_status') == 'passed'
+                and proof.get('scope_relation') == 'same_whole_scope_as_finance_ledger'
+                and proof.get('applies_to_field') == 'subtotal'
+                and proof.get('target_currency') == 'CNY'
+                and proof.get('source_sha256') and proof.get('source_locator')
+                and proof.get('source_token') and proof.get('ledger_record_id'))
+    if not required:
+        return item
+    if owner is not None:
+        for source_key, row_key in (('ledger_record_id','record_id'), ('source_token','source_token'),
+                                    ('source_locator','source_locator'), ('source_line_id','line_id')):
+            if proof.get(source_key) is not None and proof.get(source_key) != owner.get(row_key):
+                # A normalized object copied to another BOM row must lose the parent's ledger total.
+                return normalize_money(item.get('raw_value'), item.get('raw_currency'), item.get('raw_unit'),
+                                       item.get('confirmed_rate_to_cny'), item.get('source_evidence'),
+                                       item.get('finance_conversion_evidence'))
+    value = decimal(amount, 'Associated ledger CNY total')
+    if value <= 0 or value != decimal(proof.get('ledger_total_cny_tax_inclusive'), 'Reviewed ledger total'):
+        return item
+    original = normalize_money(proof.get('source_amount'), proof.get('source_currency'),
+                               proof.get('source_amount_unit'))
+    if (original.get('base_amount') != item.get('base_amount')
+            or original.get('base_currency') != item.get('base_currency')):
+        return item
+    result = deepcopy(item)
+    result.update(cny_yuan=str(value), status='cny_ready',
+                  ledger_cny_yuan=str(value), ledger_cny_evidence=deepcopy(proof))
+    result['conversion_evidence'] = [step for step in result['conversion_evidence']
+                                     if step.get('step') != 'associate_finance_ledger_CNY_total']
+    result['conversion_evidence'].append({'step':'associate_finance_ledger_CNY_total',
+                                         'not_exchange_rate':True, 'not_currency_inference':True,
+                                         'not_unit_price_allocation':True, 'evidence':deepcopy(proof)})
+    return result
+
+
 def normalize_money_fields(row, metadata=None, fields=('unit_price', 'subtotal')):
     """Return a copy with base-unit money, CNY columns, and original evidence.
 
@@ -162,7 +204,10 @@ def normalize_money_fields(row, metadata=None, fields=('unit_price', 'subtotal')
         old = previous.get(field)
         # Only reuse a prior conversion when the present value explicitly is its
         # normalized base amount; a changed value is processed as a new reading.
-        if (isinstance(old, dict) and old.get('schema') == SCHEMA and old.get('base_amount') is not None
+        if (isinstance(old, dict) and old.get('schema') == SCHEMA
+                and old.get('base_amount') is None and value is None and old.get('raw_value') is None):
+            item = normalize_money(old)
+        elif (isinstance(old, dict) and old.get('schema') == SCHEMA and old.get('base_amount') is not None
                 and unit_details(unit)[0] == '元' and currency_code(code) == old.get('base_currency')
                 and decimal(value, field) == decimal(old['base_amount'], field)):
             item = normalize_money(old)
@@ -172,6 +217,11 @@ def normalize_money_fields(row, metadata=None, fields=('unit_price', 'subtotal')
                                        rate, source or old.get('source_evidence'), finance or old.get('finance_conversion_evidence'))
         else:
             item = normalize_money(value, code, unit, rate, source, finance)
+        if field == 'subtotal':
+            item = _associate_ledger_total(item,
+                                           result.get('subtotal_finance_cny_yuan', item.get('ledger_cny_yuan')),
+                                           result.get('subtotal_finance_evidence') or item.get('ledger_cny_evidence'),
+                                           owner=result)
         normalized[field] = item
         result[field] = item['base_amount']
         result[field + '_amount_unit'] = '元'

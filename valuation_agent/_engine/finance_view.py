@@ -13,6 +13,7 @@ import re
 
 
 BASIS = 'user_finance_confirmed_contract_mapping'
+DIRECT_TOTAL = 'linked_whole_scope_ledger_total'
 _CURRENCIES = {'CNY', 'HKD', 'USD', 'SGD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD',
                'NZD', 'CHF', 'KRW', 'THB', 'MYR', 'TWD', 'MOP'}
 _ALIASES = {'RMB': 'CNY', '人民币': 'CNY', '人民币元': 'CNY', '港币': 'HKD',
@@ -73,14 +74,18 @@ def load_finance_reviewed_bases(root, ledger):
     if not path.exists():
         return out
     bases = json.loads(path.read_text()).get('bases', [])
-    counts = Counter((b.get('record_id'), b.get('source_token')) for b in bases)
+    def mapping_key(b):
+        if b.get('basis_kind') == DIRECT_TOTAL:
+            return (b.get('record_id'), b.get('source_token'), DIRECT_TOTAL, b.get('source_locator'))
+        return (b.get('record_id'), b.get('source_token'))
+    counts = Counter(mapping_key(b) for b in bases)
     attachment_root = (root / 'attachments').resolve()
     for raw in bases:
         basis = deepcopy(raw); rid, token = basis.get('record_id'), basis.get('source_token')
         record = ledger.get(rid); problems = []
         if not record or token not in {a['token'] for a in record.get('attachments', [])}:
             problems.append('source_not_attached_to_exact_ledger_record')
-        if counts[rid, token] != 1:
+        if counts[mapping_key(basis)] != 1:
             problems.append('duplicate_finance_basis_for_source')
         if not record or _amount(record.get('ledger_tax_inclusive_amount')) != _amount(basis.get('ledger_cny_yuan')):
             problems.append('ledger_CNY_amount_changed')
@@ -120,7 +125,8 @@ class FinanceView:
         Quote, invoice, optional and post-term prices keep their source status.
         """
         bases = [b for b in contract.get('finance_reviewed_bases', [])
-                 if b.get('source_token') == row.get('source_token')
+                 if b.get('basis_kind') != DIRECT_TOTAL
+                 and b.get('source_token') == row.get('source_token')
                  and b.get('record_id') == row.get('record_id')]
         if not bases:
             return None
@@ -167,12 +173,71 @@ class FinanceView:
                 'confirmed_rate_to_cny': _plain(ratio),
                 'finance_conversion_evidence': evidence}
 
+    def _direct_ledger_total(self, row, contract, ledger):
+        """Associate a complete service amount without inventing source currency/FX.
+
+        The exact row locator and amount are mandatory: a sibling BOM item cannot
+        inherit the agreement's full CNY amount merely because it shares a token.
+        """
+        bases = [b for b in contract.get('finance_reviewed_bases', [])
+                 if b.get('basis_kind') == DIRECT_TOTAL
+                 and b.get('record_id') == row.get('record_id')
+                 and b.get('source_token') == row.get('source_token')
+                 and b.get('source_locator') == row.get('source_locator')]
+        if not bases:
+            return None
+        def valid(b):
+            original = _amount(row.get('subtotal'), row.get('subtotal_amount_unit') or row.get('money_unit'))
+            reviewed = _amount(b.get('source_amount'), b.get('source_amount_unit'))
+            return (b.get('review_status') == 'whole_scope_ledger_amount_verified'
+                    and b.get('source_validation_status') == 'passed'
+                    and b.get('source_sha256') and b.get('source_locator')
+                    and b.get('scope_relation') == 'same_whole_scope_as_finance_ledger'
+                    and b.get('applies_to_fields') == ['subtotal']
+                    and (not b.get('source_line_id') or b['source_line_id'] == row.get('line_id'))
+                    and _amount(b.get('ledger_cny_yuan')) == ledger
+                    and original == reviewed and (original is None or original > 0)
+                    and _currency(b.get('source_currency')) == _currency(row.get('currency')))
+        if len(bases) != 1 or not valid(bases[0]):
+            return {'finance_conversion_status':'pending', 'confirmed_rate_to_cny':None,
+                    'finance_conversion_evidence':None,
+                    'finance_conversion_pending_reason':'invalid_or_conflicting_exact_scope_ledger_total'}
+        b = bases[0]
+        evidence = {'basis':BASIS, 'mapping_kind':DIRECT_TOTAL,
+                    'scope_relation':'same_whole_scope_as_finance_ledger',
+                    'applies_to_field':'subtotal', 'target_currency':'CNY',
+                    'source_validation_status':'passed', 'ledger_record_id':row['record_id'],
+                    'source_token':row['source_token'], 'source_locator':row['source_locator'],
+                    'source_line_id':row.get('line_id'), 'source_sha256':b['source_sha256'],
+                    'source_amount':row.get('subtotal'),
+                    'source_amount_unit':row.get('subtotal_amount_unit') or row.get('money_unit'),
+                    'source_currency':row.get('currency'),
+                    'ledger_total_cny_tax_inclusive':_plain(ledger),
+                    'not_currency_inference':True, 'not_exchange_rate':True,
+                    'not_unit_price_allocation':True, 'reviewed_mapping':deepcopy(b),
+                    'note':b.get('note') or '同一完整服务范围与已确认财务台账人民币整项金额直接关联。'}
+        return {'finance_conversion_status':'finance_ledger_scope_total',
+                'finance_conversion_pending_reason':None,
+                'confirmed_rate_to_cny':None, 'finance_conversion_evidence':None,
+                'subtotal_finance_cny_yuan':_plain(ledger), 'subtotal_finance_evidence':evidence}
+
     def for_row(self, row):
         code = _currency(row.get('currency'))
         output = {'finance_conversion_status': 'pending', 'confirmed_rate_to_cny': None,
                   'finance_conversion_evidence': None}
         def pending(reason):
             return {**output, 'finance_conversion_pending_reason': reason}
+        rid, token = row.get('record_id'), row.get('source_token')
+        contract = self.contracts.get(rid)
+        if contract and rid not in self.duplicate_records:
+            ledger = _amount(contract.get('ledger_tax_inclusive_amount'))
+            row_ledger = _amount(row.get('ledger_amount_cny_tax_inclusive'))
+            if (ledger is not None and ledger > 0 and _currency(contract.get('ledger_currency')) == 'CNY'
+                    and (row.get('ledger_amount_cny_tax_inclusive') in (None, '') or row_ledger == ledger)
+                    and not row.get('scope_association_pending') and not row.get('association_review_needed')):
+                direct = self._direct_ledger_total(row, contract, ledger)
+                if direct is not None:
+                    return direct
         if not code:
             return pending('unknown_or_missing_source_currency')
         field_codes = {_currency(row.get(field + '_currency'))

@@ -10,7 +10,7 @@ import unicodedata
 
 from estimate import number
 from money_units import normalize_money_fields
-from finance_view import FinanceView
+from finance_view import FinanceView, load_finance_reviewed_bases
 from source_registry import SourceRegistry, association_pending
 
 CHECKED_BOM = {'contract_reconciled', 'contract_reconciled_with_adjustments'}
@@ -47,7 +47,13 @@ def load(root):
         raise ValueError('项目层级与台账记录不一致')
     rows = read('quote-records.json')
     acceptance_path=root/'contract-acceptance.json'
-    finance=FinanceView(read('contract-acceptance.json')) if acceptance_path.exists() else None
+    acceptance = read('contract-acceptance.json') if acceptance_path.exists() else None
+    if acceptance is not None and (root/'source-reviews/finance-reviewed-bases.json').exists():
+        # Validate source bytes and ledger ownership at read time, not only at build time.
+        reviewed = load_finance_reviewed_bases(root, records)
+        for contract in acceptance.get('contracts', []):
+            contract['finance_reviewed_bases'] = reviewed.get(contract.get('record_id'), [])
+    finance=FinanceView(acceptance) if acceptance is not None else None
     if finance:
         for row in rows:row.update(finance.for_row(row))
     ids = [row['line_id'] for row in rows if row.get('line_id')]
@@ -115,7 +121,7 @@ def price_role_block(row):
     for values in (row, attrs):
         if any(values.get(flag) is True for flag in (
                 'exclude_from_procurement_price_comparison', 'price_reference_blocked',
-                'explicit_non_market_rate', 'user_confirmed_no_charge')):
+                'explicit_non_market_rate', 'user_confirmed_no_charge', 'finance_archive_only')):
             return 'non_procurement_or_conditional_price'
     roles = ' '.join(str(values.get(key) or '').lower()
                      for values in (row, attrs)
@@ -176,6 +182,7 @@ def reference(row, excluded):
         'source_price_version', 'detail_kind', 'source_material_raw', 'source_attributes',
         'parent_item_name', 'parent_line_id', 'source_fields_reviewed', 'source_document_type',
         'confirmed_rate_to_cny', 'finance_conversion_evidence', 'finance_conversion_status', 'finance_conversion_pending_reason',
+        'subtotal_finance_cny_yuan', 'subtotal_finance_evidence',
         'source_role', 'source_cell', 'source_table', 'source_chain', 'source_image_sha256',
         'source_original_path', 'scope_association_pending', 'association_status', 'comparison_eligible',
         'valuation_eligible', 'standard_object_name', 'source_columns', 'amount_role', 'amount_source',

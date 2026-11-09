@@ -134,7 +134,16 @@ def audit(data):
     pool = engine["workbench"].reference_pool(rows)
     packages = [row for row in pool if row.get("kind") == "whole_scope_quote"
                 or (not row.get("unit_price") and row.get("subtotal"))]
+    cny_pending = []
+    for row in pool:
+        normalized = engine["money"].normalize_money_fields(row)
+        if any(row.get(field) is not None and normalized.get(field + "_cny_yuan") is None
+               for field in ("unit_price", "subtotal")):
+            cny_pending.append(row["line_id"])
     return {"schema_version": 1, "status": "association_checks_passed", "history": metadata,
+            "cny_display_complete": not cny_pending,
+            "unconverted_reference_rows": len(cny_pending),
+            "unconverted_reference_line_ids": cny_pending,
             "reference_rows": len(pool), "package_reference_rows": len(packages),
             "unit_price_reference_rows": len(pool) - len(packages),
             "note": "验证项目、合同、原件与明细关联；允许未写或未辨字段留空，不代表每项规格都可直接比价。"}
