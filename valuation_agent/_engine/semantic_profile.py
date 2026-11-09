@@ -71,6 +71,8 @@ def procurement_service_path(name, context=''):
         return ('展览运营服务', '人员运营', role)
     if re.search(r'(?:视频|照片|素材|作品).*拍摄|拍摄(?:服务|制作)', name) and not re.search(r'器材|摄像机|摄影机|镜头|灯具', name):
         return ('影像制作服务', '拍摄服务', '素材拍摄' if re.search(r'素材|源文件', name + ' ' + context) else '摄制整包')
+    if re.search(r'plant and equipment|机械设备(?:合包|组合)|施工设备(?:费|组合)', name) and re.search(r'剪叉|scissor', context) and re.search(r'起重机|crane', context):
+        return ('项目服务', '物流与设备', '机械作业设备', '升降及起重设备组合')
     # An integrator's package is not a reference for every device mentioned in it.
     if re.search(r'(?:多媒体|音视频|影音).*(?:建设|集成|工程|采购)', name):
         return ('多媒体集成服务', '系统建设与采购', '整项范围')

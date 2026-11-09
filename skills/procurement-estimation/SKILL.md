@@ -1,6 +1,6 @@
 ---
 name: procurement-estimation
-description: 理解非标准合同和报价单，关联项目、装置及BOM明细，用 valuation-agent 查询历史参考并生成有依据的采购比价建议。适用于报价导入、归类、规格和组合对照、历史报价检索及采购建议。
+description: 理解非标准合同和报价单，关联项目、装置及BOM明细，用 valuation-agent 查询历史参考并生成可回查的比价表。适用于报价导入、归类、规格和组合对照、历史报价检索及比价表输出。
 ---
 
 # 采购估价
@@ -47,7 +47,6 @@ CLI 读取 XLSX 公式的已有缓存值，不执行公式；多表逐张明确�
 ```sh
 valuation-agent search '型号或物料 规格' --history ./history.json --limit 20 --out ./search.json
 valuation-agent compare ./normalized.json --history ./history.json --out ./comparison.json
-valuation-agent report ./comparison.json --threshold 0.15 --out ./advice.md
 ```
 
 历史 XLSX 可用 `compare --history-worksheet 表名`，`search --worksheet 表名`。已有完整兼容 Data Hub 时将 `--history ./history.json` 换为 `--data ./private-data`；二者互斥，`--data` 不是任意 JSON 文件夹。连接飞书等来源须用当前可用的授权连接器，只读获取后再归一；本地缓存查询不能说成实时遍历了飞书。
@@ -64,14 +63,9 @@ valuation-agent report ./comparison.json --threshold 0.15 --out ./advice.md
 
 复核状态是源文核对的结果，不能为获得“偏高/偏低”结果批量改成已核。单条历史报价仅是某次交易参考；即使多个项目有价格，也先排除重复证据、旧版本和范围差异。
 
-最终交付比价表，下方给出简短、结构化建议：
+最终默认只交付比价表，不在表格下附加采购建议、报价分析或长篇说明。表内保留当前物料与规格配置、参考物料、供应商、人民币价格、计价方式、差异、整包/子项范围和无参考原因。来源完整存入JSON和详情，原件页行定位不用塞进主表。
 
-- 哪些行可参考：对应历史物料/项目、供应商、价格、计价单位及规格范围差异。
-- 高低观察：仅对同配置、同范围、同计价单位且有已核价格证据的行说明相对历史的偏差；阈值是提示，不是市场定价结论。
-- 缺参考：区分已有待核线索、缺附件/缺分项价、当前输入缺参数、所选资料未收录或检索仍未对应。不能仅因没找到就断言“完全非标”。
-- 下一步：明确补什么规格/报价、找哪家历史供应商，或需要采购核对哪个包含范围。
-
-`report` 提供基线建议；Codex 应结合原件和检索证据补充具体解释，不编造供应商或价格。可用 `valuation-agent demo --output-dir ./demo-output` 演示完整流程；演示全为合成数据，必须与真实历史分开。
+`report` 是兼容的可选文档命令，仅当用户明确要求分析或报告时调用。`demo` 使用合成数据，必须与真实历史分开。
 
 币种须以原文明示为准，AUDIO 等名称不能按 ISO 代码前缀识别为澳元。财务比例折算只改变人民币展示，不升级成交或可比性状态；同文件本期付款比例不能称为整份 BOM 的付款分摊。行政报批、设计编程、设备采购、安装人工和复合服务分别归类，名称不明时保留待确认。
 

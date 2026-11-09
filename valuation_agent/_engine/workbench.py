@@ -18,7 +18,7 @@ from zipfile import ZipFile
 from estimate import call, column
 from quote_classification import (billing_unit, bundled_evidence, comparable_class, process_reference,
                                   process_terms, quote_classification)
-from quote_parameters import parameter_comparison, parameter_text_only, parameters
+from quote_parameters import parameter_comparison, parameter_text_only, parameters, normalize_specification_text
 from reference_catalog import ReferenceCatalog, template_context
 from semantic_profile import models, actions, classification_trace, scope_text, inspect_input
 from valuation import is_checked, load, norm, positive, reference, rejection, price_role_block, view_only_variant
@@ -85,9 +85,9 @@ REFERENCE_MATERIALS_AND_PROCESSES = (*MATERIALS, ('烤漆', '喷漆'))
 SPEC_MATERIALS = (*MATERIALS, ('钢结构', '钢架', '钢方通', '方钢', '铁管', '镀锌方管'),
                   ('钢木结构',), ('金属',), ('PC板', 'pc板'), ('铝塑板',), ('铝合金',), ('pvc',), ('pp背胶',))
 SCOPE_PARTS = {
-    '设计': r'设计|策划', '制作': r'制作|加工|定制', '供货': r'供货|设备采购',
+    '设计': r'设计|策划', '制作': r'制作|加工|定制', '供货': r'供货|设备采购|购买|购置|网购|\bsupply\b|\bpurchase\b',
     '安装': r'安装|搭建|试搭|预搭', '调试': r'调试|测试', '运输': r'运输|运费',
-    '拆除': r'拆除|撤场', '运维': r'运维|维护', '租赁': r'租赁|租用',
+    '拆除': r'拆除|撤场', '运维': r'运维|维护', '租赁': r'租赁|租用|租金|\brental\b|\brent\b|\bhire\b',
     '建模': r'建模|模型制作', '绑定': r'绑定',
     '动画': r'动画', '渲染': r'渲染', '剪辑': r'剪辑', '特效': r'特效',
 }
@@ -110,7 +110,12 @@ def scope_parts(value):
 
 @lru_cache(maxsize=32768)
 def specification(value):
-    return re.sub(r'\s+', '', norm(value)).replace('×', 'x').replace('*', 'x')
+    return re.sub(r'\s+', '', normalize_specification_text(norm(value))).replace('×', 'x').replace('*', 'x')
+
+
+@lru_cache(maxsize=32768)
+def informative_spec(value):
+    return bool(value and not re.fullmatch(r'(?:定制|按需定制|通用|标准|无|未注明|详见图纸|见图|n/?a)[。.]?', value))
 
 
 @lru_cache(maxsize=32768)
@@ -224,10 +229,16 @@ def relationship(query, row, catalog_match=None):
     bundle_reason = bundled_evidence(current_path, historical_path)
     labor_partial = bool(re.search(r'电箱|电缆|配电', context) and past == '电工')
     catalog_bridge = bool(catalog_match and not (current_path and historical_path))
-    same_model = bool(current_models and historical_models and current_models == historical_models)
+    hardware_paths = (current_path[:2] == ('展陈物料', '多媒体硬件')
+                      or current_path[:2] == ('源字段分级', '2.7'))
+    current_brand, historical_brand = norm(query.get('brand')), norm(row.get('brand'))
+    generic_brands = {'', '国产', '定制', '通用', '无', '/', '未注明'}
+    brand_conflict = bool(hardware_paths and current_brand not in generic_brands
+                          and historical_brand not in generic_brands and current_brand != historical_brand)
+    same_model = bool(current_models and historical_models and current_models == historical_models and not brand_conflict)
     digital_related = bool(current_path and historical_path and current_path[0] == historical_path[0] == '数字内容与技术服务'
                            and (current_path[1] == historical_path[1] or '数字内容制作' in (current_path[1], historical_path[1]) or actions(context) & actions(historical_details)))
-    same_spec = bool(spec and spec == past_spec)
+    same_spec = bool(informative_spec(spec) and spec == past_spec)
     family = _family_match(name, past)
     near = min(len(name), len(past)) >= 3 and (name in past or past in name)
     current_type, historical_type = light_subtype(name), light_subtype(past)
@@ -249,13 +260,37 @@ def relationship(query, row, catalog_match=None):
     equivalent_specs = same_parameters and parameter_text_only(spec) and parameter_text_only(past_spec)
     requested, requested_exclusions = scope_parts(context)
     offered, offered_exclusions = scope_parts(historical)
+    current_rental, historical_rental = '租赁' in requested, '租赁' in offered
+    transaction_difference = ''
+    if current_rental != historical_rental:
+        explicit_supply = {'制作', '供货'}
+        if current_rental and offered & explicit_supply:
+            transaction_difference = '交易方式不同（当前：租赁；历史：制作或供货）'
+        elif historical_rental and requested & explicit_supply:
+            transaction_difference = '交易方式不同（当前：制作或供货；历史：租赁）'
+        else:
+            transaction_difference = ('当前为租赁，历史交易方式未注明' if current_rental else
+                                      '历史为租赁，当前交易方式未注明')
+    attrs = row.get('source_attributes') or {}
+    exact_source_names = [source.get('name') for source in row.get('contract_sources', [])
+                          if source.get('token') == row.get('source_token')]
+    source_scope_title = ' '.join(norm(value) for value in
+                                 (row.get('work_package'), row.get('contract_name'), row.get('module'),
+                                  attrs.get('contract_name'), attrs.get('source_scope_title'), *exact_source_names))
+    ambiguous_removal_scope = bool(not current_removal and re.search(r'撤场|拆除|拆卸', source_scope_title)
+                                  and not historical_rental and not scope_parts(historical_details)[0])
+
     components = [part.strip() for part in re.split(r'[、+，,；;]|搭配', config) if len(part.strip()) >= 2]
     explicit_bundle = len(components) > 1
     same_bundle = (all(part in historical for part in components) if explicit_bundle
                    else len(requested) > 1 and requested == offered)
-    differences = []
+    differences = [transaction_difference] if transaction_difference else []
+    if ambiguous_removal_scope:
+        differences.append('历史出自撤场或拆除清单，本行未明确交易/作业范围，不能当成新制作单价')
     spec_differences = []
-    if current_models and historical_models and not same_model:
+    if brand_conflict:
+        spec_differences.append(f'品牌不同（当前：{query["brand"]}；历史：{row["brand"]}）')
+    if current_models and historical_models and current_models != historical_models:
         spec_differences.append(f'型号不同（当前：{"+".join(sorted(current_models))}；历史：{"+".join(sorted(historical_models))}）')
     elif current_models and not historical_models:
         differences.append('历史型号未注明')
@@ -326,6 +361,9 @@ def relationship(query, row, catalog_match=None):
     elif labor_partial:
         tier,label,reason=18,'部分工作参考','历史只列电工人工，不包含当前电箱、电缆或设备租赁费用'
         differences.append('人工与设备材料合包范围不同')
+    elif transaction_difference or ambiguous_removal_scope:
+        tier, label, reason = 20, '交易或作业范围参考', (transaction_difference or
+                        '历史来自撤场清单，只能核对对象，不能确认是新制、拆除、回收还是其他费用')
     elif attribute_reason:
         tier, label, reason = 26, '工艺旁证', attribute_reason
         differences.append('适用范围或报价构成不同')
@@ -415,9 +453,13 @@ def quoted_components(query):
         found = {}
         for part in parts:
             part = re.sub(r'^(?:包含|包括|含有|含)\s*[：:]?\s*', '', part.strip())
+            if re.search(r'不含|不包括|另计|参考图', part):
+                continue
             item = COMPONENT.fullmatch(part)
             if item:
-                found[item['name']] = (item['quantity'], item['unit'])
+                if positive(item['quantity']):
+                    found[item['name']] = (item['quantity'], item['unit'])
+                continue
             elif field == 'configuration' and re.fullmatch(r'[\u4e00-\u9fff]{2,16}', part):
                 found[part] = (None, None)
             elif not re.search(r'不含|不包括|另计|参考图', part):
@@ -459,11 +501,25 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
         if query_path[:2] == ('数字内容与技术服务', 'AI内容'):
             return 0 if tuple(past_path[:2]) == query_path[:2] else 1
         return 0
-    candidates.sort(key=lambda x: (any(word in x[1][1] for word in ('旁证', '工艺参考')),
-                                   family_distance(x),
-                                   not bool(x[1][6] and x[1][6]['current'] == x[1][6]['historical']),
-                                   billing_unit(norm(x[0]['unit'])) != current_unit,
-                                   x[0]['currency'] != query.get('currency'), x[1][0]))
+    def evidence_rank(candidate):
+        row, relation = candidate
+        label = relation[1]
+        if any(term in label for term in ('工艺', '同材')):
+            channel = 4
+        elif '旁证' in label:
+            channel = 3
+        elif any(term in label for term in ('部分', '交易或作业')):
+            channel = 2
+        elif any(term in label for term in ('同型号', '同规格', '参数一致', '型号或规格与组合一致')):
+            channel = 0
+        else:
+            channel = 1
+        return (channel, family_distance(candidate), relation[0],
+                norm(row.get('item_name')) != norm(query.get('name')),
+                not bool(relation[6] and relation[6]['current'] == relation[6]['historical']),
+                billing_unit(norm(row.get('unit'))) != current_unit,
+                row.get('currency') != query.get('currency'))
+    candidates.sort(key=evidence_rank)
     result = []
     seen = set()
     projects = set()
@@ -485,11 +541,22 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
         record = ledger[row['record_id']]
         folder = root / 'attachments' / hashlib.sha256(row['source_token'].encode()).hexdigest()
         source = next(iter(sorted(folder.glob('source.*'))), folder / 'document.xml')
+        included_component = row.get('source_document_type') == 'included_component_amount'
         package_total = row.get('kind') == 'whole_scope_quote' or not (positive(row.get('unit_price')) and row.get('unit'))
         monthly_fee = attrs.get('monthly_fee_cny')
+        multiplier = row.get('billing_multiplier') or row.get('price_multiplier')
+        multiplier_label = attrs.get('rate_multiplier_label') or row.get('rate_multiplier_label')
+        rate_units = {'场次':('每场单价','场'), '天数':('每日单价','天'), '月数':('每月单价','月')}
+        multiplier_rate = rate_units.get(multiplier_label) if multiplier is not None else None
+        if multiplier is not None:
+            differences.append('历史单价另乘' + str(multiplier_label or '计费倍数') + '，不等于完整工作量总价')
         if monthly_fee is not None:
             differences.append('历史单价为每人月费用；整期小计单独保留，未注明月数不反推')
-        if package_total:
+        if included_component:
+            label = '子件金额注记'
+            reason += '。整机配置中的子件金额注记，不是独立采购单价；不与整机金额重复加总'
+            differences.append('整机配置子件金额，不代表独立采购或完整整包价格')
+        elif package_total:
             label = '整包金额参考' if row.get('kind') == 'whole_scope_quote' else '明细金额参考'
             reason += '。历史仅提供范围金额，不作为当前分项单价或整项高低判断依据'
             differences.append('整包或明细总额与分项单价不可直接比较')
@@ -508,14 +575,16 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
                        'match_kind': label, 'differences': list(dict.fromkeys(differences)), 'spec_differences': list(dict.fromkeys(spec_differences)),
                        'reference_price_type': 'package_total' if package_total else 'unit_price',
                        'reference_total': row.get('subtotal'),
-                       'reference_rate_basis': 'monthly_per_person' if monthly_fee is not None else None,
-                       'reference_rate_label': '每人月费用' if monthly_fee is not None else None,
-                       'reference_rate_unit': '人/月' if monthly_fee is not None else None,
+                       'reference_rate_basis': 'monthly_per_person' if monthly_fee is not None else 'source_multiplier_rate' if multiplier is not None else None,
+                       'reference_rate_label': '每人月费用' if monthly_fee is not None else multiplier_rate[0] if multiplier_rate else '原单价（另计倍数）' if multiplier is not None else None,
+                       'reference_rate_unit': '人/月' if monthly_fee is not None else str(row.get('unit') or '') + '·' + multiplier_rate[1] if multiplier_rate else None,
+                       'reference_billing_multiplier': multiplier,
+                       'reference_billing_multiplier_label': multiplier_label,
                        'reference_total_cny_yuan': ref.get('subtotal_cny_yuan'),
                        'independent_sample_key': row.get('economic_purchase_group') or attrs.get('economic_purchase_group') or row.get('purchase_evidence_group') or attrs.get('purchase_evidence_group') or attrs.get('observation_family') or attrs.get('shared_quote_family') or row.get('project_key'),
-                       'price_comparison_eligible': not package_total and not view_only_variant(row) and exclusion is None and not [d for d in differences if d != '币种不同'] and not component,
+                       'price_comparison_eligible': not included_component and not package_total and not view_only_variant(row) and exclusion is None and not [d for d in differences if d != '币种不同'] and not component,
                        'match_reason': reason, 'parameters': compared,
-                       'comparison_role': 'package' if package_total else 'component' if component else 'package' if '整包旁证' in label else 'process' if '工艺' in label else 'partial' if '部分' in label else 'candidate',
+                       'comparison_role': 'component' if included_component else 'package' if package_total else 'component' if component else 'package' if '整包旁证' in label else 'process' if '工艺' in label else 'partial' if '部分' in label or '交易或作业' in label else 'candidate',
                        'classification': classification,
                        'template_categories': template_context(catalog, row, 'item_name'),
                        'source_url': f'{GITHUB}/attachments/{folder.name}/{source.name}' if GITHUB and source.is_file() else None})

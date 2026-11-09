@@ -25,6 +25,22 @@ ELECTRICAL_UNITS = {
 }
 
 
+CABLE_SIZE = re.compile(r'(?<![a-z0-9])(?P<code>rvvp?|bvv?p?|rvsp|yjv)\s*(?P<cores>\d+)\s*[x×*]\s*(?P<area>\d+(?:[.,]\d+)?)(?![\d.])', re.I)
+
+
+@lru_cache(maxsize=32768)
+def normalize_specification_text(value):
+    """Normalize decimal commas only inside known cable or labelled metric sizes.
+
+    Never apply the monetary thousands-separator rule to a specification. Lists
+    such as N100,8G and 320,160 stay intact.
+    """
+    value = re.sub(r'(?<![a-z0-9])((?:rvvp?|bvv?p?|rvsp|yjv)\s*\d+\s*[x×*]\s*\d+),(\d{1,2})(?!\d)',
+                   r'\1.\2', value, flags=re.I)
+    return re.sub(r'((?:直径|厚度|长|宽|高|厚|[lwhφø])\s*[:=]?\s*\d+),(\d{1,2})\s*(mm|cm|毫米|厘米|米|m)(?![a-z0-9])',
+                  r'\1.\2\3', value, flags=re.I)
+
+
 def parameters(value, default_dimension_unit=''):
     # Return independent dictionaries: current-query merging must not mutate a cache entry.
     return {label: dict(entries) for label, entries in _parameter_values(value, default_dimension_unit)}
@@ -32,6 +48,9 @@ def parameters(value, default_dimension_unit=''):
 
 @lru_cache(maxsize=32768)
 def _parameter_values(value, default_dimension_unit=''):
+    # Some original dimension cells omit a separator between two labelled axes.
+    value = normalize_specification_text(value)
+    value = re.sub(r'(?<=\d)(?=[lwh]\s*[:=]?\s*\d)', '×', value)
     output = {}
     # An explicit unit at the end of an axis chain applies to the other axes in that chain.
     for phrase in re.split(r'[，,；;。\n]', value):
@@ -61,6 +80,10 @@ def _parameter_values(value, default_dimension_unit=''):
             amount = Decimal(match['number']) * factor
             if key != '色温' or amount >= 1000:
                 output.setdefault(key, {})[amount] = match[0]
+    for cable in CABLE_SIZE.finditer(value):
+        area = Decimal(cable['area'].replace(',', '.'))
+        output.setdefault('线缆截面积', {})[area] = cable['area'] + '（线缆规格编码）'
+        output.setdefault('线缆芯数', {})[Decimal(cable['cores'])] = cable['cores'] + ' 芯'
     technical = (
         ('屏幕尺寸', rf'({NUMBER})\s*(?:英寸|寸|inch)', '寸'),
         ('刷新率', rf'({NUMBER})\s*hz', 'Hz'),

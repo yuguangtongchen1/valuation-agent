@@ -3,3 +3,10 @@
 @media(prefers-reduced-motion:reduce){:root{scroll-behavior:auto}}
 .mobile-unit{display:none}.detail-bom-wrap{margin-top:14px}.detail-bom th:first-child{width:46%}.detail-bom th:nth-child(2){width:11%}.detail-bom th:nth-child(3){width:10%}.detail-bom th:nth-child(4){width:16%}.detail-bom th:nth-child(5){width:17%}.bom-spec{display:block;font-size:.75rem;font-weight:400;color:var(--muted);margin-top:3px}.comparison-title{margin:26px 0 14px}@media(max-width:700px){.mobile-unit{display:inline}.detail-bom{font-size:.7rem}.detail-bom th,.detail-bom td{padding:9px 5px}.detail-bom th:first-child{width:40%}.detail-bom th:nth-child(2){width:10%}.detail-bom th:nth-child(3){width:10%}.detail-bom th:nth-child(4){width:20%}.detail-bom th:nth-child(5){width:20%}.bom-spec{font-size:.65rem}}
 body:has(dialog[open]){overflow:hidden}.detail-bom th{white-space:nowrap}@media(max-width:700px){.demo-section>.section-heading{display:grid;grid-template-columns:1fr;gap:12px}.demo-section>.section-heading>.demo-label{grid-row:1;justify-self:start}.demo-section>.section-heading h2{font-size:1.2rem}.commands-section>.section-heading{display:block}.commands-section>.section-heading>.text-link{margin-top:14px}.detail-bom th:first-child{width:34%}.detail-bom th:nth-child(2){width:12%}.detail-bom th:nth-child(3){width:12%}.detail-bom th:nth-child(4){width:18%}.detail-bom th:nth-child(5){width:24%}}
+
+/* Copy handoff and readable reference text at narrow widths. */
+.hero-copy-button{cursor:pointer;font:inherit;max-width:100%}.hero-copy-button:focus-visible{outline:3px solid var(--blue);outline-offset:4px}
+.reference-project{font-size:clamp(.8rem,.77rem + .1vw,.9rem);line-height:1.55;overflow-wrap:anywhere}
+.reference-reason{font-size:clamp(.82rem,.78rem + .15vw,.95rem);line-height:1.6}
+.reference-price{white-space:nowrap;font-variant-numeric:tabular-nums}
+@media(max-width:700px){.hero-actions .hero-copy-button{font-size:.9rem}.reference-project{font-size:.8rem}.reference-result{grid-template-columns:minmax(0,1fr) auto}.reference-title{overflow-wrap:anywhere}.guide .prompt-block{white-space:pre-wrap;overflow-wrap:anywhere}}

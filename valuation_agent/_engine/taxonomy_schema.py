@@ -126,6 +126,9 @@ def applicable_categories(schema, name, detail=''):
     for key,pattern in PATTERNS.items():
         if ai_only and key.startswith('cg.'):
             continue
+        # Incidental reimbursable travel does not change a consultancy's purchased object.
+        if key == 'mc.travel' and not re.search(pattern, name) and re.search(r'consult(?:ing|ancy|ant)|public relations|business advisory|公关顾问|咨询服务', name+' '+detail):
+            continue
         if key in available and re.search(pattern,name+' '+detail):
             score=2 if re.search(pattern,name) else 1
             # Render is an explicit worker stage, not a replacement for lookdev/output.
