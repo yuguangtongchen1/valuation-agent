@@ -127,6 +127,12 @@ def quote_classification(name, context):
     digital = digital_path(name, context)
     if digital and re.search(r'数字(?:多媒体)?内容|多媒体内容', name):
         return digital
+    if '梯子' in name:
+        ladder_context = name + ' ' + context
+        if re.search(r'租赁|租用|登高|施工工具|人字梯|伸缩梯', ladder_context):
+            return ('项目服务', '物流与设备', '设备租赁', '登高梯具')
+        if re.search(r'铁艺|金属', ladder_context) and re.search(r'定做|定制|喷漆|烤漆|造型|装饰', ladder_context):
+            return ('展陈制作', '道具制作', '金属造型道具', '定制装饰梯子')
     route = row_route({'item_name':name,'description':context})
     if route and (route.get('priority') or re.search(r'插件|程序开发|软件开发|硬件驱动|框架编程',name)):
         return _routed_path(route,name)
