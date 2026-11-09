@@ -136,9 +136,10 @@ def applicable_categories(schema, name, detail=''):
         if not category['id'].startswith('photo.') or len(category['path']) < 3:
             continue
         leaf=category['path'][-1].lower()
-        aliases=re.findall(r'[\u4e00-\u9fff]{2,}|[a-z][a-z0-9-]{2,}',leaf)
+        aliases=re.findall(r'[\u4e00-\u9fff]{2,}|[a-z][a-z0-9-]*(?:[ /][a-z0-9-]+)*',leaf)
+        aliases=[re.sub(r'\s+',' ',a).strip() for a in aliases]
         aliases=[a for a in aliases if a not in {'fee','other','misc','cost','staff','equipment'}]
-        if any(a == name.strip() or (len(a)>=3 and a in name) for a in aliases):
+        if any(a == name.strip() or (len(a)>=3 and (a in name if re.search(r'[\u4e00-\u9fff]', a) else re.search(r'(?<![a-z0-9])' + re.escape(a) + r'(?![a-z0-9])', name))) for a in aliases):
             found.append((3,len(category['path']),category))
     found.sort(key=lambda x:(-x[0],-x[1]))
     return [category for _,_,category in found]

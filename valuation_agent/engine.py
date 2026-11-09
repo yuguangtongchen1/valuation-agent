@@ -8,7 +8,7 @@ import sys
 
 ENGINE_FILES = (
     "workbench.py", "valuation.py", "estimate.py", "quote_classification.py",
-    "quote_parameters.py", "semantic_profile.py", "reference_catalog.py",
+    "quote_parameters.py", "semantic_profile.py", "reference_catalog.py", "row_classification.py",
     "source_registry.py", "money_units.py", "taxonomy_schema.py", "finance_view.py",
 )
 

@@ -72,3 +72,5 @@ valuation-agent report ./comparison.json --threshold 0.15 --out ./advice.md
 - 下一步：明确补什么规格/报价、找哪家历史供应商，或需要采购核对哪个包含范围。
 
 `report` 提供基线建议；Codex 应结合原件和检索证据补充具体解释，不编造供应商或价格。可用 `valuation-agent demo --output-dir ./demo-output` 演示完整流程；演示全为合成数据，必须与真实历史分开。
+
+币种须以原文明示为准，AUDIO 等名称不能按 ISO 代码前缀识别为澳元。财务比例折算只改变人民币展示，不升级成交或可比性状态；同文件本期付款比例不能称为整份 BOM 的付款分摊。行政报批、设计编程、设备采购、安装人工和复合服务分别归类，名称不明时保留待确认。

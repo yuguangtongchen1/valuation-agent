@@ -2,6 +2,7 @@
 import re
 from functools import lru_cache
 from semantic_profile import digital_path
+from row_classification import row_route
 
 
 def floor_classification(name, context):
@@ -100,8 +101,28 @@ COMPILED_RULES = [(tuple(path.split('/')), re.compile(name), re.compile(context[
                   for path, name, *context in RULES]
 
 
+def _routed_path(route, name):
+    # Broad filing leaves are not synonym declarations. Keep the explicit item
+    # identity at the leaf so a cabinet cannot become a motherboard comparable.
+    return ('源字段分级', route['code'], *route['leaf'], name)
+
+
+def classify_row(row):
+    """Shared row-aware entry used by CLI, preserving parent-operation evidence."""
+    name = str(row.get('item_name') or row.get('name') or '').lower().strip()
+    context = ' '.join(str(row.get(field) or '') for field in ('spec','model','description','configuration','scope','module'))
+    route = row_route({**row, 'item_name':name})
+    if route and route.get('priority'):
+        return _routed_path(route,name)
+    path = quote_classification(name, context.lower())
+    return path or (_routed_path(route,name) if route else ())
+
+
 @lru_cache(maxsize=8192)
 def quote_classification(name, context):
+    route = row_route({'item_name':name,'description':context})
+    if route and (route.get('priority') or re.search(r'插件|程序开发|软件开发|硬件驱动|框架编程',name)):
+        return _routed_path(route,name)
     if re.search(r'地面保护|地毯保护|地板保护', name):
         return ('项目服务', '施工保障', '现场保护', '保护材料或围护组合')
     digital = digital_path(name, context)
@@ -113,7 +134,7 @@ def quote_classification(name, context):
     for path, names, attributes in COMPILED_RULES:
         if names.search(name) and (attributes is None or attributes.search(context)):
             return path
-    return ()
+    return _routed_path(route,name) if route else ()
 
 
 def comparable_class(current, historical, name, past):

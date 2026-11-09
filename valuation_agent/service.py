@@ -12,7 +12,7 @@ def classify(document):
     rows = []
     for row in document["rows"]:
         context = " ".join(str(row.get(field) or "") for field in ("spec", "model", "description", "configuration", "scope"))
-        path = engine["classification"].quote_classification(row["item_name"], context)
+        path = engine["classification"].classify_row(row)
         parsed = engine["parameters"].parameters(engine["valuation"].norm(context))
         rows.append({**row, "classification_path": list(path),
                      "parameters": {label: [{"normalized_value": str(key), "source_text": value}
