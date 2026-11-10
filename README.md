@@ -2,7 +2,7 @@
 
 将报价单导入为明细，按用途、交付内容、型号、规格和组合查询历史报价，输出可回查的比价表。CLI 与工作台共用归类和检索引擎；不会仅凭物料名称判断价格高低。
 
-发行包只含通用代码和合成示例，不含公司的合同、台账、图片、Token 或登录状态。所有命令在本地运行，不自动上传文件，也不自动访问飞书。
+发行包只含通用代码和合成示例，不含公司的合同、台账、图片、Token 或登录状态。默认在本地运行，不自动访问飞书。显式使用 --remote 时，仅把报价检索所需字段发送到你配置的 HTTPS 接口，不发送原 Excel/PDF，也不下载历史数据库。
 
 ## 安装与演示
 
@@ -16,7 +16,7 @@ python3 -m venv .venv
 
 演示会生成 `quote.json`、`history.json`、`comparison.json` 和 `report.md`。所有项目、供应商及金额均为合成数据。报告演示同配置参考、材质差异、组合中的部分子件及未找到参考四种情况。
 
-## 七个命令
+## 常用命令
 
 ```sh
 # 1. 生成合成演示
@@ -150,3 +150,18 @@ valuation-agent compare ./quotation.xlsx --worksheet 报价 --data ./private-dat
 ```
 
 离线数据保存在使用者电脑上，授权后无法远程撤销；请只分发给获准接触公司报价的内部人员。
+
+## 内部服务器查询（0.2.8）
+
+由管理员为指定人员分别提供访问配置（endpoint、token），不要把配置上传GitHub或复制进聊天。macOS/Linux配置文件须权限600。
+
+```sh
+valuation-agent run 新报价.xlsx --worksheet 报价 --remote /path/to/remote.json --output-dir 比价结果
+valuation-agent search 灯控网线 --remote /path/to/remote.json
+valuation-agent contract <检索返回的record_id> --remote /path/to/remote.json --out 合同明细.json
+```
+
+服务器只返回匹配结果，Excel和JSON在本机生成，默认不生成采购建议。每人凭证独立、可撤销、有到期时间和请求限额；授权结果仍可被使用者保存。原0.2.6/0.2.7离线副本不会因服务端撤销而被删除。
+
+
+管理员提供的访问配置只放在使用者本机，不包含在公开仓库、Skill 或命令参数中。不要把 token 粘贴到 Codex 聊天；让 Codex 使用配置文件路径即可。Windows 使用 `py` 和 `.venv\Scripts\valuation-agent.exe`，macOS/Linux 使用 `python3` 和 `.venv/bin/valuation-agent`。客户端需要联网访问查询服务，无需下载历史数据包或部署自己的服务器。

@@ -5,7 +5,7 @@ description: 理解非标准合同和报价单，关联项目、装置及BOM明�
 
 # 采购估价
 
-先理解实际交付内容，再比较价格。Codex 负责逐份理解非标原件、辨认字段和复核候选；`valuation-agent` 负责本地归一、规则归类、检索和报告，不自带 OCR、远程模型或飞书实时读取。
+先理解实际交付内容，再比较价格。Codex 负责逐份理解非标原件、辨认字段和复核候选；`valuation-agent` 负责归一、规则归类、检索和表格输出，不自带 OCR、远程模型或飞书实时读取。
 
 ## 开始
 
@@ -19,6 +19,18 @@ python3 -m venv .venv
 ```
 
 随后用 `.venv/bin/valuation-agent` 替代下方的 `valuation-agent`。Skill 不需要私有仓库或其脚本。
+
+## 内部服务器模式
+
+管理员已提供访问配置时优先用 `--remote /path/to/remote.json`。使用者只需安装 CLI 和 Excel 依赖；不用下载历史数据库。不要让用户把 token 写入聊天、参数或仓库，只读取管理员已放好的配置路径。不要把离线副本当作服务器实时数据。
+
+```sh
+valuation-agent run ./quotation.xlsx --worksheet 报价 --remote /path/to/remote.json --output-dir ./比价结果
+valuation-agent search '用途 型号 规格' --remote /path/to/remote.json
+valuation-agent contract <返回的record_id> --remote /path/to/remote.json --out ./合同明细.json
+```
+
+`run` 只生成两张工作表的 Excel 和 JSON，不生成采购建议。远程模式只发送检索字段，原文件不上传；返回的历史参考仍属于内部数据。401 联系管理员核对凭证，403 核对权限，429 稍后重试，503 等当前查询完成；不要循环重试或绕过 HTTPS。Windows 使用 `py` 和 `.venv\Scripts\valuation-agent.exe`，macOS/Linux 使用 `python3` 和 `.venv/bin/valuation-agent`。
 
 ## 理解并导入
 

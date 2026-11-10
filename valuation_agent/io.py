@@ -14,8 +14,8 @@ from .engine import modules
 ALIASES = {
     "item_name": ("item_name", "name", "名称", "物料", "物料名称", "材料名称", "产品名称", "服务名称"),
     "model": ("model", "型号", "产品型号"),
-    "spec": ("spec", "specification", "规格", "规格型号", "规格/型号", "规格 / 型号", "规格尺寸", "规格/尺寸"),
-    "description": ("description", "工艺说明", "描述", "工作内容", "服务内容"),
+    "spec": ("spec", "specification", "规格", "规格型号", "规格/型号", "规格 / 型号", "规格尺寸", "规格/尺寸", "尺寸mm"),
+    "description": ("description", "工艺说明", "工艺描述", "描述", "工作内容", "服务内容"),
     "configuration": ("configuration", "配置", "组合", "组合模式"),
     "quantity": ("quantity", "qty", "数量"),
     "unit": ("unit", "单位", "计价单位"),
@@ -71,13 +71,13 @@ def write_json(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2, default=str) + "\n", encoding="utf-8")
 
 
-def table_rows(headers, values):
+def table_rows(headers, values, start_row=2):
     headers = [str(h).strip() if h is not None else "" for h in headers]
     active = [h for h in headers if h]
     if len(set(active)) != len(active):
         raise ValueError("表头名称重复；请先区分同名列")
     result = []
-    for index, row in enumerate(values, 2):
+    for index, row in enumerate(values, start_row):
         if not any(v is not None and str(v).strip() for v in row):
             continue
         if len(row) > len(headers) and any(v not in (None, "") for v in row[len(headers):]):
@@ -136,10 +136,32 @@ def read_input(path, worksheet=None):
                 raise ValueError("XLSX 有多个工作表，请用 --worksheet 指定，避免漏读")
             sheet = book[worksheet] if worksheet else book[book.sheetnames[0]]
             iterator = sheet.iter_rows(values_only=True)
-            headers = next(iterator, None)
-            if not headers:
-                raise ValueError("工作表为空")
-            rows = table_rows(headers, iterator)
+            headers = None
+            for header_index, candidate in enumerate(iterator, 1):
+                if header_index > 30:break
+                names={str(v).strip().casefold() for v in candidate if v is not None}
+                has_name=any(a.casefold() in names for a in ALIASES['item_name'])
+                has_quantity=any(a.casefold() in names for a in ALIASES['quantity'])
+                has_price=any(a.casefold() in names or any(money_header(n,(a,)) for n in names) for a in ALIASES['unit_price']+ALIASES['subtotal'])
+                if has_name and (has_quantity or has_price):
+                    headers=candidate;break
+            if headers is None:
+                raise ValueError("前30行未找到明确的物料与数量/金额表头，请由 Skill 明确映射后转为JSON")
+            rows = table_rows(headers, iterator, header_index+1)
+            items=[]; non_items=[]
+            for source_row in rows:
+                filled={k:v for k,v in source_row.items() if k!='_input_row' and v is not None and str(v).strip()}
+                named=any(str(source_row.get(a) or '').strip() for a in ALIASES['item_name'])
+                if not named and len(filled)==1 and isinstance(next(iter(filled.values())),str):
+                    non_items.append({'kind':'section_or_note','source_original_fields':source_row});continue
+                labels={'合计','总计','含税合计','税额','优惠价','优惠价：','优惠价:'}
+                quantity=str(source_row.get('数量') or '').strip()
+                summary_label=quantity in labels or bool(re.fullmatch(r'\d+(?:\.\d+)?%税',quantity))
+                if not named and summary_label and set(filled).issubset({'数量','金额','小计','总价'}):
+                    non_items.append({'kind':'summary','source_original_fields':source_row});continue
+                items.append(source_row)
+            rows=items
+            metadata['non_item_rows']=non_items
             metadata["worksheet"] = sheet.title
         finally:
             book.close()
@@ -189,4 +211,4 @@ def read_input(path, worksheet=None):
         normalized.append(row)
     return {"schema_version": 1, "project": metadata.get("project", ""), "currency": metadata.get("currency", ""),
             "source_file": path.name, "source_sha256": digest, "worksheet": metadata.get('worksheet'), "synthetic": metadata.get("synthetic", False),
-            "rows": normalized}
+            "rows": normalized, "non_item_rows": metadata.get("non_item_rows", [])}
