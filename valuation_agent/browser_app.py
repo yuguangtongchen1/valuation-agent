@@ -1,0 +1,82 @@
+"""Local browser UI proxies authorized queries; no historical database on disk."""
+import argparse,base64,io,json,secrets,tempfile,threading,webbrowser
+from http.server import HTTPServer,BaseHTTPRequestHandler
+from pathlib import Path
+from urllib.parse import urlsplit
+from .activation import activate,default_config
+from .remote import remote_call
+from .io import read_input
+from .cli import remote_compare
+from .excel_export import export_comparison
+
+MAX_BODY=32*1024*1024
+
+def make_handler(config,session_key):
+    config=Path(config)
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self,*args):pass
+        def allowed(self):
+            host=f'127.0.0.1:{self.server.server_port}'
+            return self.headers.get('Host')==host and self.headers.get('Origin',f'http://{host}')==f'http://{host}'
+        def respond(self,status,body,kind='application/json; charset=utf-8'):
+            raw=body if isinstance(body,bytes)else json.dumps(body,ensure_ascii=False,allow_nan=False).encode()
+            self.send_response(status);self.send_header('Content-Type',kind);self.send_header('Content-Length',str(len(raw)));self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Referrer-Policy','no-referrer');self.send_header('X-Frame-Options','DENY');self.end_headers();self.wfile.write(raw)
+        def do_GET(self):
+            if not self.allowed():return self.respond(403,{'error':'仅允许本机访问。'})
+            path=urlsplit(self.path).path
+            if path=='/':
+                html=Path(__file__).with_name('web').joinpath('index.html').read_text().replace('__SESSION__',session_key)
+                return self.respond(200,html.encode(),'text/html; charset=utf-8')
+            if path=='/health':return self.respond(200,{'status':'ok','configured':config.is_file()})
+            return self.respond(404,{'error':'未找到文件。'})
+        def do_POST(self):
+            if not self.allowed()or self.headers.get('X-Workbench-Session')!=session_key:return self.respond(403,{'error':'请从本机工作台重新打开。'})
+            try:
+                length=int(self.headers.get('Content-Length','0'))
+                if not 0<length<=MAX_BODY:return self.respond(413,{'error':'文件过大，请拆分。'})
+                obj=json.loads(self.rfile.read(length));action=urlsplit(self.path).path
+                if not isinstance(obj,dict):raise ValueError('请求格式无效。')
+                if action=='/api/activate':
+                    activate(obj.get('code'),config);return self.respond(200,{'ok':True})
+                if action=='/api/import':
+                    suffix=Path(str(obj.get('filename',''))).suffix.lower()
+                    if suffix not in ('.xlsx','.xls','.csv','.json'):raise ValueError('请上传 Excel、CSV 或 JSON。')
+                    raw=base64.b64decode(obj.get('content',''),validate=True)
+                    with tempfile.TemporaryDirectory(prefix='valuation-import-')as tmp:
+                        path=Path(tmp)/('报价'+suffix);path.write_bytes(raw)
+                        if suffix=='.xlsx' and not obj.get('worksheet'):
+                            from openpyxl import load_workbook
+                            book=load_workbook(path,read_only=True,data_only=True)
+                            sheets=book.sheetnames;book.close()
+                            if len(sheets)>1:return self.respond(200,{'worksheets':sheets})
+                        if suffix=='.xls'and not obj.get('worksheet'):
+                            from .engine import modules
+                            sheets=[s['name']for s in modules()['legacy'].legacy_xls_document(raw)['sheets']]
+                            if len(sheets)>1:return self.respond(200,{'worksheets':sheets})
+                        doc=read_input(path,obj.get('worksheet'))
+                        for row in doc['rows']:
+                            if not row.get('currency'):row['currency']='CNY'
+                        return self.respond(200,{'document':doc})
+                if action=='/api/compare':return self.respond(200,remote_compare(obj['document'],config))
+                if action=='/api/contract':return self.respond(200,remote_call('contract',{'record_id':obj['record_id']},config))
+                if action=='/api/export':
+                    with tempfile.TemporaryDirectory(prefix='valuation-export-')as tmp:
+                        path=Path(tmp)/'比价结果.xlsx';export_comparison(obj['result'],path);raw=path.read_bytes()
+                    return self.respond(200,raw,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                return self.respond(404,{'error':'未知操作。'})
+            except (OSError,ValueError,KeyError,TypeError)as exc:
+                # Never echo submitted activation data or low-level network headers.
+                message='访问码激活失败，请核对访问码和网络。'if urlsplit(self.path).path=='/api/activate'else str(exc)
+                return self.respond(400,{'error':message})
+            except Exception:return self.respond(500,{'error':'处理失败，请检查文件格式或稍后重试。'})
+    return Handler
+
+def launch(config=None,port=0,no_browser=False):
+    handler=make_handler(config or default_config(),secrets.token_urlsafe(32))
+    server=HTTPServer(('127.0.0.1',port),handler)
+    url=f'http://127.0.0.1:{server.server_port}/'
+    print('估价工作台已启动：'+url+'\n请保持此进程运行；关闭请按 Ctrl+C。',flush=True)
+    if not no_browser:threading.Timer(0.5,lambda:webbrowser.open(url)).start()
+    try:server.serve_forever()
+    except KeyboardInterrupt:pass
+    finally:server.server_close()

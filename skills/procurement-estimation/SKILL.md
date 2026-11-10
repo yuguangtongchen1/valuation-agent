@@ -20,6 +20,14 @@ python3 -m venv .venv
 
 随后用 `.venv/bin/valuation-agent` 替代下方的 `valuation-agent`。Skill 不需要私有仓库或其脚本。
 
+## 用户拿到安装指令和访问码时
+
+用户要求直接使用/打开界面时，安装带 Excel 依赖的最新版，然后运行 `valuation-agent launch`，保持进程运行并打开输出的 localhost URL。不要只展示 help、跑 demo、生成 JSON 后结束。首次无配置时界面显示访问码输入；已有配置直接进入上传报价。界面内可以上传、整单比价、看历史参考、打开合同明细、导出 Excel。
+
+访问码为 `VA1.` 开头、可撤销的个人内部凭证，不能写进公开 Skill、安装脚本、仓库或网页 URL。用户已经在聊天提供时，用进程标准输入交给 `valuation-agent activate`，不回显；或读取用户给定的本地访问码文件 `valuation-agent activate --file <path>`。不把码放进命令参数，也不将某人的访问码共享给其他人。若用户未提供，只打开激活页，不捏造凭证。
+
+Windows 解释器用 `py`、虚拟环境 `.valuation-env\Scripts\python.exe`；macOS/Linux 用 `python3`、`.valuation-env/bin/python`。安装 `valuation-agent[excel]`，不是仅基础包。包内自带网页，不需要 Node 或另取前端目录。默认随机可用端口，避免冲突；远程执行环境自动打开浏览器失败时，明确给出 URL 并打开本机浏览器。服务应持续运行直至用户完成。
+
 ## 内部服务器模式
 
 管理员已提供访问配置时优先用 `--remote /path/to/remote.json`。使用者只需安装 CLI 和 Excel 依赖；不用下载历史数据库。不要让用户把 token 写入聊天、参数或仓库，只读取管理员已放好的配置路径。不要把离线副本当作服务器实时数据。

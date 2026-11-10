@@ -4,6 +4,34 @@
 
 发行包只含通用代码和合成示例，不含公司的合同、台账、图片、Token 或登录状态。默认在本地运行，不自动访问飞书。显式使用 --remote 时，仅把报价检索所需字段发送到你配置的 HTTPS 接口，不发送原 Excel/PDF，也不下载历史数据库。
 
+## 安装并打开操作界面（0.2.9）
+
+给指定内部用户两样东西：下面的安装启动命令，以及管理员单独提供的 `VA1.` 访问码。公开网站不含真实访问码，也不会因安装成功而自动获得公司数据权限。
+
+macOS / Linux：
+
+```sh
+python3 -m venv .valuation-env
+.valuation-env/bin/python -m pip install --upgrade 'valuation-agent[excel] @ git+https://github.com/yuguangtongchen1/valuation-agent.git'
+.valuation-env/bin/valuation-agent launch
+```
+
+Windows（PowerShell）：
+
+```powershell
+py -m venv .valuation-env
+.\.valuation-env\Scripts\python.exe -m pip install --upgrade "valuation-agent[excel] @ git+https://github.com/yuguangtongchen1/valuation-agent.git"
+.\.valuation-env\Scripts\valuation-agent.exe launch
+```
+
+需要 Python 3.9+、Git 和联网，无需 Node.js、压缩包或历史数据库。`launch` 自动打开浏览器；首次粘贴访问码激活，之后直接上传报价。流程：上传 → 整单比价 → 点单价查看历史参考 → 点参考进入合同明细 → 导出 Excel。页面只在本机监听；命令进程要保持运行。远程桌面环境不能自动打开浏览器时，用终端输出的本机网址打开。
+
+**直接粘贴给另一位 Codex 的说明：**
+
+> 读取本仓库 README 和 skills/procurement-estimation/SKILL.md，安装最新版 CLI，然后运行 valuation-agent launch 并保持服务运行，打开输出的本机网址。使用我单独提供的访问码启用，不要只运行合成演示后结束。访问码不要写入代码、日志或 GitHub；若我直接在聊天提供访问码，用标准输入交给下述 activate 命令，不再回显它。完成后让我在操作界面上传报价，只输出比价表，不生成采购建议。
+
+访问码是持有即授权的内部凭证，不是公开演示码；每人单独发放，到期/撤销后不能继续查询。若不方便在浏览器中粘贴，可执行 `valuation-agent activate` 并在隐藏输入中输入访问码；或用受限本地文本文件：`valuation-agent activate --file /path/to/access.txt`。不把访问码放在命令行参数中。
+
 ## 安装与演示
 
 Python 3.9 或以上。建议使用独立环境：

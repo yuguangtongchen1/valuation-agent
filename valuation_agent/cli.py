@@ -39,6 +39,13 @@ def main(argv=None):
     run_sources.add_argument("--data", type=Path)
     run_sources.add_argument("--remote", type=Path, help="仅查询服务器，不下载历史数据库")
     quick.add_argument("--output-dir", type=Path, default=Path("比价结果"))
+    activation = commands.add_parser("activate", help="通过隐藏输入或本机文件激活访问码，不回显凭证")
+    activation.add_argument("--file", type=Path)
+    activation.add_argument("--remote", type=Path)
+    browser = commands.add_parser("launch", help="自动打开本机操作界面；首次使用输入管理员访问码")
+    browser.add_argument("--remote", type=Path)
+    browser.add_argument("--port", type=int, default=0)
+    browser.add_argument("--no-browser", action="store_true")
     check = commands.add_parser("audit", help="只读校验 Data Hub 的项目、合同、原件与报价关联")
     check.add_argument("--data", type=Path, required=True)
     check.add_argument("--out", type=Path)
@@ -72,6 +79,17 @@ def main(argv=None):
     report.add_argument("--threshold", default="0.15", help="偏高/偏低提示阈值，例如 0.15 代表 15%%")
     args = parser.parse_args(argv)
     try:
+        if args.command == "activate":
+            import getpass
+            from .activation import activate
+            code=args.file.read_text().strip() if args.file else getpass.getpass('管理员访问码（隐藏输入）：') if sys.stdin.isatty() else sys.stdin.read().strip()
+            activate(code,args.remote)
+            print('访问已激活。运行 valuation-agent launch 打开操作界面。')
+            return
+        if args.command == "launch":
+            from .browser_app import launch
+            launch(args.remote,args.port,args.no_browser)
+            return
         if args.command == "demo":
             result = demo(args.output_dir)
         elif args.command == "run":
