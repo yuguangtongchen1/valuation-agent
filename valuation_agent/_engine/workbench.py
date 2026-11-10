@@ -517,11 +517,23 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
             channel = 0
         else:
             channel = 1
-        return (channel, family_distance(candidate), relation[0],
-                norm(row.get('item_name')) != norm(query.get('name')),
+        historical_unit = billing_unit(norm(row.get('unit')))
+        attrs = row.get('source_attributes') or {}
+        monthly = attrs.get('monthly_fee_cny') is not None
+        multiplier = row.get('billing_multiplier') or row.get('price_multiplier')
+        label = attrs.get('rate_multiplier_label') or row.get('rate_multiplier_label')
+        denominator = '月' if monthly else {'场次':'场','天数':'天','月数':'月'}.get(label) if multiplier is not None else None
+        if denominator and historical_unit and not historical_unit.endswith('/'+denominator):
+            historical_unit += '/'+denominator
+        unit_distance = 0 if current_unit and historical_unit == current_unit else 1 if not current_unit or not historical_unit else 2
+        package = row.get('kind') == 'whole_scope_quote' or not (positive(row.get('unit_price')) and row.get('unit'))
+        scope_distance = int(package and current_unit not in ('项','套','组',''))
+        differences = [d for d in relation[2] if d != '币种不同']
+        return (channel, family_distance(candidate), scope_distance, unit_distance,
+                len(differences), len(relation[3]), relation[0],
                 not bool(relation[6] and relation[6]['current'] == relation[6]['historical']),
-                billing_unit(norm(row.get('unit'))) != current_unit,
-                row.get('currency') != query.get('currency'))
+                norm(row.get('item_name')) != norm(query.get('name')),
+                row.get('currency') != query.get('currency'), str(row.get('line_id','')))
     candidates.sort(key=evidence_rank)
     result = []
     seen = set()
