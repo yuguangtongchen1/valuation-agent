@@ -139,3 +139,14 @@ valuation-agent audit --data ./private-data --out ./audit.json
 0.2.3 修复报价刷新/前进恢复、重复文件重开、失败重试和文件错误提示；本机工作台直接读取旧版XLS，保留缓存数值及合并表头。投影机整机不再以吊架、改色或镜头服务充当设备价格。
 
 0.2.4 优化参考排序：同用途候选优先比较有效计费单位、报价范围和规格差异，再比较名称；每人月/每场费率不冒充普通单位。工作台侧栏隐藏供应商，详情保留，并随栏宽调整字号。
+
+## 内部离线数据包
+
+0.2.5 支持经校验的轻量数据快照。内部人员取得单独提供的数据包后，使用 `--data ./private-data` 查询或比价；无需服务器。启动时核验快照校验和、记录数量和合同关联，失败会报错。公开安装包仍不含真实数据。
+
+```sh
+valuation-agent search "灯控网线" --data ./private-data
+valuation-agent compare ./quotation.xlsx --worksheet 报价 --data ./private-data --out ./comparison.json
+```
+
+离线数据保存在使用者电脑上，授权后无法远程撤销；请只分发给获准接触公司报价的内部人员。

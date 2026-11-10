@@ -55,6 +55,9 @@ def load_history(data=None, history=None, worksheet=None):
     engine = modules()
     if data:
         root = Path(data).resolve()
+        if (root / "query-snapshot.json").is_file():
+            from .runtime_snapshot import load_snapshot
+            return load_snapshot(root)
         rows, duplicates, shared, record_count, checked_count = engine["valuation"].load(root)
         # Older whole-scope exports have a source position but no BOM line ID.
         # A stable view ID lets the same lookup show these as package references,
