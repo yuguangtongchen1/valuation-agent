@@ -17,6 +17,22 @@ class BrowserDeliveryTests(unittest.TestCase):
    with patch('valuation_agent.remote.remote_call',return_value={}):activate(code,path)
    self.assertEqual(path.stat().st_mode&0o777,0o600)
   with self.assertRaises(ValueError):parse_access_code('VA1.e30')
+ def test_original_workbench_remote_adapter_and_cache(self):
+  with tempfile.TemporaryDirectory()as tmp:
+   cfg=Path(tmp)/'remote.json';cfg.write_text('{}')
+   server=HTTPServer(('127.0.0.1',0),make_handler(cfg,'session-test'))
+   thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start();url=f'http://127.0.0.1:{server.server_port}'
+   try:
+    page=urllib.request.urlopen(url).read().decode();self.assertIn('<div id="root"></div>',page);self.assertIn('X-Workbench-Session',page)
+    payload={'name':'地台','spec':'钢木结构','unit':'平米','quantity':'5','exclude':'self-record'}
+    mocked={'rows':[{'quote':{'item_name':'地台'},'references':[{'record_id':'self-record'},{'record_id':'other','signed_date':'2025/1/1','unit_price':'30'}]}]}
+    with patch('valuation_agent.browser_app.remote_compare',return_value=mocked)as compare:
+     for _ in range(2):
+      req=urllib.request.Request(url+'/api/valuation/lookup',data=json.dumps(payload).encode(),headers={'X-Workbench-Session':'session-test','Content-Type':'application/json'})
+      out=json.load(urllib.request.urlopen(req));self.assertEqual(len(out['references']),1);self.assertEqual(out['references'][0]['sheet'],'2025')
+     self.assertEqual(compare.call_count,1);self.assertEqual(compare.call_args[0][0]['rows'][0]['item_name'],'地台')
+     self.assertEqual(compare.call_args[0][0]['rows'][0]['spec'],'钢木结构')
+   finally:server.shutdown();server.server_close()
  def test_local_origin_session_and_ui_assets(self):
   with tempfile.TemporaryDirectory()as tmp:
    server=HTTPServer(('127.0.0.1',0),make_handler(Path(tmp)/'remote.json','session-test'))

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "valuation-agent"
-version = "0.2.9"
+version = "0.2.10"
 description = "Source-linked quotation classification, comparison and procurement reports"
 readme = "PUBLIC_README.md"
 requires-python = ">=3.9"
@@ -23,4 +23,4 @@ include = ["valuation_agent*"]
 include-package-data = false
 
 [tool.setuptools.package-data]
-valuation_agent = ["web/*.html"]
+valuation_agent = ["web/*.html", "web/assets/*", "web/*.xlsx"]

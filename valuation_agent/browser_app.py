@@ -1,5 +1,6 @@
 """Local browser UI proxies authorized queries; no historical database on disk."""
-import argparse,base64,io,json,secrets,tempfile,threading,webbrowser
+import argparse,base64,io,json,secrets,tempfile,threading,webbrowser,mimetypes,copy
+from urllib.parse import unquote,parse_qs
 from http.server import HTTPServer,BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -13,6 +14,40 @@ MAX_BODY=32*1024*1024
 
 def make_handler(config,session_key):
     config=Path(config)
+    assets=Path(__file__).with_name('web');cache={}
+    def query_row(query):
+        return {'item_name':str(query.get('name')or query.get('item_name')or ''),**{k:v for k,v in query.items()if k in ('quantity','unit','currency','model','spec','configuration','dimension_unit','description')}}
+    def enrich(found):
+        for row in found.get('references',[]):
+            row.setdefault('sheet',str(row.get('signed_date')or '')[:4])
+        return found
+    def lookups(queries):
+        if not isinstance(queries,list)or not 1<=len(queries)<=1000 or not all(isinstance(q,dict)for q in queries):raise ValueError('报价格式无法处理。')
+        keys=[json.dumps(q,sort_keys=True,ensure_ascii=False)for q in queries]
+        missing=list(dict.fromkeys(k for k in keys if k not in cache))
+        if missing:
+            doc={'rows':[query_row(json.loads(k))for k in missing]}
+            compared=remote_compare(doc,config)
+            if len(compared['rows'])!=len(missing):raise ValueError('比价结果行数不一致。')
+            for key,item in zip(missing,compared['rows']):
+                item=copy.deepcopy(item);query=json.loads(key)
+                item['references']=[r for r in item.get('references',[])if not query.get('exclude')or r.get('record_id')!=query['exclude']]
+                cache[key]=enrich(item)
+        output=[copy.deepcopy(cache[k])for k in keys]
+        if len(cache)>1500:cache.clear()
+        return output
+    def original_api(action,query):
+        if action in ('lookup','batch'):
+            results=lookups(query if action=='batch'else[query]);return results if action=='batch'else results[0]
+        if action=='contract':
+            result=remote_call('contract',{'record_id':query.get('exclude')},config)
+            for row in result['lines']:row.setdefault('sheet',str(row.get('signed_date')or '')[:4])
+            return result
+        if action=='demo':
+            result=remote_call('search',{'phrase':'数字内容','limit':3},config)
+            return result.get('references',[])
+        if action=='oa':raise ValueError('此电脑需要先配置飞书读取授权；也可从飞书下载 Excel 后使用原界面的上传入口。')
+        raise ValueError('未知操作。')
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
         def allowed(self):
@@ -24,9 +59,23 @@ def make_handler(config,session_key):
         def do_GET(self):
             if not self.allowed():return self.respond(403,{'error':'仅允许本机访问。'})
             path=urlsplit(self.path).path
-            if path=='/':
-                html=Path(__file__).with_name('web').joinpath('index.html').read_text().replace('__SESSION__',session_key)
+            if path in ('/','/index.html'):
+                template=assets/('index.html'if config.is_file()else'activation.html')
+                html=template.read_text().replace('__SESSION__',session_key)
+                if config.is_file():
+                    bridge="<script>window.fetch=((original)=>function(input,options){const url=new URL(typeof input==='string'?input:input.url,location.href);if(url.origin===location.origin&&url.pathname.startsWith('/api/')){options={...options,headers:new Headers(options?.headers)};options.headers.set('X-Workbench-Session',%s);}return original(input,options);})(window.fetch.bind(window));</script>"%json.dumps(session_key)
+                    html=html.replace('<head>','<head>'+bridge,1)
                 return self.respond(200,html.encode(),'text/html; charset=utf-8')
+            decoded=unquote(path)
+            if decoded.startswith('/assets/')or decoded=='/报价单示例.xlsx':
+                target=(assets/decoded.lstrip('/')).resolve()
+                if target.is_relative_to(assets.resolve())and target.is_file():return self.respond(200,target.read_bytes(),mimetypes.guess_type(target.name)[0]or'application/octet-stream')
+            if path.startswith('/api/valuation/'):
+                if self.headers.get('X-Workbench-Session')!=session_key:return self.respond(403,{'error':'请从本机工作台重新打开。'})
+                try:
+                    query={k:v[0]for k,v in parse_qs(urlsplit(self.path).query).items()}
+                    return self.respond(200,original_api(path.rsplit('/',1)[1],query))
+                except (OSError,ValueError,KeyError,TypeError)as exc:return self.respond(400,{'error':str(exc)})
             if path=='/health':return self.respond(200,{'status':'ok','configured':config.is_file()})
             return self.respond(404,{'error':'未找到文件。'})
         def do_POST(self):
@@ -34,7 +83,13 @@ def make_handler(config,session_key):
             try:
                 length=int(self.headers.get('Content-Length','0'))
                 if not 0<length<=MAX_BODY:return self.respond(413,{'error':'文件过大，请拆分。'})
-                obj=json.loads(self.rfile.read(length));action=urlsplit(self.path).path
+                raw=self.rfile.read(length);action=urlsplit(self.path).path
+                if action=='/api/valuation/legacy-xls':
+                    from .engine import modules
+                    return self.respond(200,modules()['legacy'].legacy_xls_document(raw))
+                obj=json.loads(raw)
+                if action.startswith('/api/valuation/'):
+                    return self.respond(200,original_api(action.rsplit('/',1)[1],obj))
                 if not isinstance(obj,dict):raise ValueError('请求格式无效。')
                 if action=='/api/activate':
                     activate(obj.get('code'),config);return self.respond(200,{'ok':True})
