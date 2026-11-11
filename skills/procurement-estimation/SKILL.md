@@ -118,3 +118,9 @@ valuation-agent compare ./normalized.json --history ./history.json --out ./compa
 5. 新安装后重启工作台以刷新 PATH，并重试原链接；核对实际导入的工作表与行数，继续比价、详情和导出。无法完成时报告具体阻塞，本地 Excel 上传仍可使用。
 
 普通本地 Excel 工作流不依赖 Node.js 或飞书 CLI；只在使用飞书来源时补齐这些依赖。
+
+## 指定用户的一次复制交付
+
+管理员提供已有个人访问码文件后，用 `valuation-agent handoff --access-file <个人访问码文件> --out <私密命令文件>` 生成一行命令；Windows 加 `--windows`。不新建权限、不共用其他用户的码，不输出命令内容到日志，不提交生成文件到 Git。输出文件不得已存在。
+
+接收方将专属命令粘贴给 Codex 后，直接执行安装、标准输入激活和 launch，保持进程运行并打开本机 URL，不再要求手动填写访问码。先检查 Python 3.9+；Windows 使用 py，macOS/Linux 使用 python3。若授权已过期或撤销，停止并联系管理员，不重复安装或绕过授权。飞书导入仍需接收方自己的飞书授权。专属命令内含凭据，仅私发给对应人员，不在官网展示。

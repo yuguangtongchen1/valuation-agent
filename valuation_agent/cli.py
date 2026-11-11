@@ -42,6 +42,10 @@ def main(argv=None):
     activation = commands.add_parser("activate", help="通过隐藏输入或本机文件激活访问码，不回显凭证")
     activation.add_argument("--file", type=Path)
     activation.add_argument("--remote", type=Path)
+    handoff = commands.add_parser("handoff", help="从已有个人访问码生成私密一行交付命令，不签发新权限")
+    handoff.add_argument("--access-file", type=Path, required=True)
+    handoff.add_argument("--out", type=Path, required=True)
+    handoff.add_argument("--windows", action="store_true")
     browser = commands.add_parser("launch", help="自动打开本机操作界面；首次使用输入管理员访问码")
     browser.add_argument("--remote", type=Path)
     browser.add_argument("--port", type=int, default=0)
@@ -80,6 +84,11 @@ def main(argv=None):
     report.add_argument("--threshold", default="0.15", help="偏高/偏低提示阈值，例如 0.15 代表 15%%")
     args = parser.parse_args(argv)
     try:
+        if args.command == "handoff":
+            from .handoff import write_command
+            target=write_command(args.access_file.read_text().strip(), args.out, args.windows)
+            print("专属命令已保存：" + str(target) + "；仅私下发给此凭证对应用户。")
+            return
         if args.command == "feishu-setup":
             from .feishu_setup import setup
             setup()
