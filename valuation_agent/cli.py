@@ -47,6 +47,8 @@ def main(argv=None):
     handoff.add_argument("--out", type=Path, required=True)
     handoff.add_argument("--windows", action="store_true")
     browser = commands.add_parser("launch", help="自动打开本机操作界面；首次使用输入管理员访问码")
+    browser.add_argument("--input", type=Path, help="载入并持续同步 Codex 提供的报价文件")
+    browser.add_argument("--worksheet", help="指定 Excel 工作表")
     browser.add_argument("--remote", type=Path)
     browser.add_argument("--port", type=int, default=0)
     browser.add_argument("--no-browser", action="store_true")
@@ -102,7 +104,7 @@ def main(argv=None):
             return
         if args.command == "launch":
             from .browser_app import launch
-            launch(args.remote,args.port,args.no_browser)
+            launch(args.remote,args.port,args.no_browser,args.input,args.worksheet)
             return
         if args.command == "demo":
             result = demo(args.output_dir)

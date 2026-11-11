@@ -12,9 +12,24 @@ from .excel_export import export_comparison
 
 MAX_BODY=32*1024*1024
 
-def make_handler(config,session_key):
+def make_handler(config,session_key,input_path=None,worksheet=None):
     config=Path(config)
     assets=Path(__file__).with_name('web');cache={}
+    handoff_state = {}
+    def handoff():
+        if input_path is None:return {'revision':None}
+        source=Path(input_path)
+        stamp=(source.stat().st_mtime_ns,source.stat().st_size)
+        if handoff_state.get('stamp')!=stamp:
+            document=read_input(source,worksheet)
+            if not document.get('rows'):raise ValueError('报价文件没有可展示的明细。')
+            for row in document['rows']:
+                row.setdefault('currency','CNY')
+            revision=secrets.token_hex(12)
+            handoff_state.update(stamp=stamp,revision=revision,document=document)
+            cache.clear()
+        if not config.is_file():raise ValueError('请先激活工作台。')
+        return {'revision':handoff_state['revision'],'document':handoff_state['document'],'filename':source.name}
     def query_row(query):
         return {'item_name':str(query.get('name')or query.get('item_name')or ''),**{k:v for k,v in query.items()if k in ('quantity','unit','currency','model','spec','configuration','dimension_unit','description')}}
     def enrich(found):
@@ -37,6 +52,7 @@ def make_handler(config,session_key):
         if len(cache)>1500:cache.clear()
         return output
     def original_api(action,query):
+        if action=='handoff':return handoff()
         if action in ('lookup','batch'):
             results=lookups(query if action=='batch'else[query]);return results if action=='batch'else results[0]
         if action=='contract':
@@ -137,10 +153,10 @@ def make_handler(config,session_key):
             except Exception:return self.respond(500,{'error':'处理失败，请检查文件格式或稍后重试。'})
     return Handler
 
-def launch(config=None,port=0,no_browser=False):
-    handler=make_handler(config or default_config(),secrets.token_urlsafe(32))
+def launch(config=None,port=0,no_browser=False,input_path=None,worksheet=None):
+    handler=make_handler(config or default_config(),secrets.token_urlsafe(32),input_path,worksheet)
     server=HTTPServer(('127.0.0.1',port),handler)
-    url=f'http://127.0.0.1:{server.server_port}/'
+    url=f'http://127.0.0.1:{server.server_port}/'+('?handoff=1' if input_path else '')
     print('估价工作台已启动：'+url+'\n请保持此进程运行；关闭请按 Ctrl+C。',flush=True)
     if not no_browser:threading.Timer(0.5,lambda:webbrowser.open(url)).start()
     try:server.serve_forever()

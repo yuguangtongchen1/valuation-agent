@@ -124,3 +124,11 @@ valuation-agent compare ./normalized.json --history ./history.json --out ./compa
 管理员提供已有个人访问码文件后，用 `valuation-agent handoff --access-file <个人访问码文件> --out <私密命令文件>` 生成一行命令；Windows 加 `--windows`。不新建权限、不共用其他用户的码，不输出命令内容到日志，不提交生成文件到 Git。输出文件不得已存在。
 
 接收方将专属命令粘贴给 Codex 后，直接执行安装、标准输入激活和 launch，保持进程运行并打开本机 URL，不再要求手动填写访问码。先检查 Python 3.9+；Windows 使用 py，macOS/Linux 使用 python3。若授权已过期或撤销，停止并联系管理员，不重复安装或绕过授权。飞书导入仍需接收方自己的飞书授权。专属命令内含凭据，仅私发给对应人员，不在官网展示。
+
+## 左侧对话与原版工作台联动
+
+用户在聊天提供新报价时，先读取文件并理解字段、规格和组合；普通 Excel 可直接使用，非标表先用模型整理成 `{ "project": "项目名称", "rows": [{"item_name":"名称","spec":"规格","description":"工艺","quantity":1,"unit":"套","unit_price":100,"subtotal":100,"currency":"CNY"}] }` JSON，保留 source_locator 和原文。不能凭空补金额或规格。
+
+运行 `valuation-agent launch --input <报价文件绝对路径> --worksheet <需要时指定工作表>`，保持服务运行，将返回的带 `?handoff=1` 的 URL 在可用的 Codex 右侧浏览器打开；无法控制面板时提供 URL，不声称已打开。已有远程配置可加 `--remote <路径>`。激活后会自动加载，无需用户再次上传。
+
+AI 理解与候选复核由当前 Codex 完成；工作台通过服务器查询历史参考，不内置自动聊天模型。用户纠正后，原子更新同一 JSON 文件，页面约两秒检测新版本并更新表格；修改会清除旧参考缓存。不要只改左侧回复而不更新文件。新的报价文件可以另启动实例，避免混淆项目。同步只读取明确指定文件，不监听用户全部聊天或磁盘。完成后实际检查页面明细和导出，不将成功启动等同于比价正确。
