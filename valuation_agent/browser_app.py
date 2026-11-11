@@ -1,5 +1,5 @@
 """Local browser UI proxies authorized queries; no historical database on disk."""
-import argparse,base64,io,json,secrets,tempfile,threading,webbrowser,mimetypes,copy
+import argparse,base64,io,json,secrets,tempfile,threading,webbrowser,mimetypes,copy,subprocess
 from urllib.parse import unquote,parse_qs
 from http.server import HTTPServer,BaseHTTPRequestHandler
 from pathlib import Path
@@ -46,7 +46,16 @@ def make_handler(config,session_key):
         if action=='demo':
             result=remote_call('search',{'phrase':'数字内容','limit':3},config)
             return result.get('references',[])
-        if action=='oa':raise ValueError('此电脑需要先配置飞书读取授权；也可从飞书下载 Excel 后使用原界面的上传入口。')
+        if action == 'oa':
+            from .engine import modules
+            link = query.get('link')
+            worksheet = query.get('worksheet', '')
+            if not isinstance(link, str) or len(link) > 1200 or not isinstance(worksheet, str) or len(worksheet) > 120:
+                raise ValueError('请检查飞书链接和工作表名称。')
+            try:
+                return modules()['workbench'].oa_file(link, worksheet)
+            except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+                raise ValueError('无法读取飞书报价。请检查本机飞书 CLI 授权和链接权限，或下载 Excel 后上传。') from exc
         raise ValueError('未知操作。')
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
@@ -61,7 +70,7 @@ def make_handler(config,session_key):
             path=urlsplit(self.path).path
             if path in ('/','/index.html'):
                 template=assets/('index.html'if config.is_file()else'activation.html')
-                html=template.read_text().replace('__SESSION__',session_key)
+                html=template.read_text(encoding='utf-8').replace('__SESSION__',session_key)
                 if config.is_file():
                     bridge="<script>window.fetch=((original)=>function(input,options){const url=new URL(typeof input==='string'?input:input.url,location.href);if(url.origin===location.origin&&url.pathname.startsWith('/api/')){options={...options,headers:new Headers(options?.headers)};options.headers.set('X-Workbench-Session',%s);}return original(input,options);})(window.fetch.bind(window));</script>"%json.dumps(session_key)
                     html=html.replace('<head>','<head>'+bridge,1)

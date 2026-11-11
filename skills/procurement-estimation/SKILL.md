@@ -104,3 +104,5 @@ valuation-agent compare ./normalized.json --history ./history.json --out ./compa
 完整兼容 Data Hub 可用 `valuation-agent audit --data ./private-data --out ./audit.json` 检查关联；通过不等于每个字段已核实或所有报价可比。
 
 对于原件未标币种、但完整单项服务与财务台账已精确核对的记录，可直接关联该项人民币台账总额作为小计展示；保留未知原币种，不伪造汇率或单价。直接关联必须限定来源行和相同完整范围，不得让其他子项继承整笔金额。零台账记录不能一刀切；只有明确核过的无人民币价格依据档案排除人民币价格召回，BOM和原价仍保留。`audit` 的 `unconverted_reference_rows` 用于检查可检索价格池的人民币展示缺口。
+
+用户提供内部专用的 Python 启动文件并要求启动时，使用 Python 运行该文件并保持工作台进程运行。文件负责安装、激活及打开原版界面，运行前后均无需在对话中复制文件里的个人访问码。飞书导入沿用本机已授权的飞书 CLI。
