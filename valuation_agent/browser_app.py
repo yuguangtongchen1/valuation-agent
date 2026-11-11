@@ -54,8 +54,10 @@ def make_handler(config,session_key):
                 raise ValueError('请检查飞书链接和工作表名称。')
             try:
                 return modules()['workbench'].oa_file(link, worksheet)
+            except FileNotFoundError as exc:
+                raise ValueError('缺少飞书读取依赖。请让 Codex 运行 valuation-agent feishu-setup 自动检测并安装飞书 CLI，然后完成飞书授权并重启工作台。') from exc
             except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
-                raise ValueError('无法读取飞书报价。请检查本机飞书 CLI 授权和链接权限，或下载 Excel 后上传。') from exc
+                raise ValueError('飞书读取未成功。请让 Codex 运行 lark-cli auth status --json --verify 检查授权；授权正常则核对当前账号的文件权限及读取错误。估价访问码不包含飞书权限。也可下载 Excel 后上传。') from exc
         raise ValueError('未知操作。')
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args):pass

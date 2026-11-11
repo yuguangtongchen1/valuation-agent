@@ -5,7 +5,7 @@ description: 理解非标准合同和报价单，关联项目、装置及BOM明�
 
 # 采购估价
 
-先理解实际交付内容，再比较价格。Codex 负责逐份理解非标原件、辨认字段和复核候选；`valuation-agent` 负责归一、规则归类、检索和表格输出，不自带 OCR、远程模型或飞书实时读取。
+先理解实际交付内容，再比较价格。Codex 负责逐份理解非标原件、辨认字段和复核候选；`valuation-agent` 负责归一、规则归类、检索和表格输出，不自带 OCR 或远程模型；飞书读取需安装并授权官方飞书 CLI。
 
 ## 开始
 
@@ -106,3 +106,15 @@ valuation-agent compare ./normalized.json --history ./history.json --out ./compa
 对于原件未标币种、但完整单项服务与财务台账已精确核对的记录，可直接关联该项人民币台账总额作为小计展示；保留未知原币种，不伪造汇率或单价。直接关联必须限定来源行和相同完整范围，不得让其他子项继承整笔金额。零台账记录不能一刀切；只有明确核过的无人民币价格依据档案排除人民币价格召回，BOM和原价仍保留。`audit` 的 `unconverted_reference_rows` 用于检查可检索价格池的人民币展示缺口。
 
 用户提供内部专用的 Python 启动文件并要求启动时，使用 Python 运行该文件并保持工作台进程运行。文件负责安装、激活及打开原版界面，运行前后均无需在对话中复制文件里的个人访问码。飞书导入沿用本机已授权的飞书 CLI。
+
+## 飞书链接导入：主动修复新电脑环境
+
+用户粘贴飞书链接或遇到飞书读取失败时，不只返回“检查授权”。使用官方指南：https://open.feishu.cn/document/no_class/mcp-archive/feishu-cli-installation-guide.md 。
+
+1. 在运行估价工作台的同一台电脑、同一用户环境检查 `lark-cli --version`、`node --version`、`npm --version`。缺少 Node.js 时按 Node.js 官方安装方式安装 LTS（含 npm/npx），不要复制其他电脑的凭据。
+2. 缺少飞书 CLI 时，主动运行 `valuation-agent feishu-setup`；它按官方指南安装 `npm install -g @larksuite/cli` 和 `npx -y skills add https://open.feishu.cn --skill -y`。若已有 CLI，复用它；缺少官方 Skills 时补装 Skills。权限不足不自动 sudo，给出具体失败环节。
+3. 阅读已安装的 lark-shared Skill，运行 `lark-cli auth status --json --verify`。仅未配置应用时运行 `lark-cli config init --new`，不覆盖已有配置。未登录/授权失效时按官方指南和 lark-shared 发起用户登录；展示授权链接及二维码，用户完成后收尾登录并复查状态。登录必须由接收方自己的账号完成；不将估价访问码当飞书 token。
+4. 授权正常后，用飞书只读命令读取用户原链接，区分文件无权限、缺 scope、链接类型不支持、网络失败和表格解析失败。不要反复重装；不要把所有异常都归为未登录。仅请求所需读取权限，不输出密钥。
+5. 新安装后重启工作台以刷新 PATH，并重试原链接；核对实际导入的工作表与行数，继续比价、详情和导出。无法完成时报告具体阻塞，本地 Excel 上传仍可使用。
+
+普通本地 Excel 工作流不依赖 Node.js 或飞书 CLI；只在使用飞书来源时补齐这些依赖。
