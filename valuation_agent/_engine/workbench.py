@@ -363,7 +363,8 @@ def relationship(query, row, catalog_match=None):
                                  for group in REFERENCE_MATERIALS_AND_PROCESSES)
     object_related = bool(same_model or class_match or bundle_reason or attribute_reason or
                           catalog_bridge or digital_related or labor_partial or family or near or
-                          name == past or material_process_match)
+                          name == past or (material_process_match and current_path and historical_path
+                                           and current_path[:3] == historical_path[:3]))
     if not object_related:
         return None
     if historical_package and not re.search(r'整包|布景|套装',name):
