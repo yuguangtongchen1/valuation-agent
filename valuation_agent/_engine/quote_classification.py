@@ -3,6 +3,7 @@ import re
 from functools import lru_cache
 from semantic_profile import digital_path, procurement_service_path
 from row_classification import row_route
+from exhibition_knowledge import concept_path
 
 
 def floor_classification(name, context):
@@ -25,6 +26,8 @@ def floor_classification(name, context):
 
 
 RULES = (
+    ('项目服务/技术与保障/设计深化/施工图深化', r'施工图深化|施工图设计|展陈优化设计'),
+    ('展陈物料/多媒体硬件/计算设备/平板电脑', r'安卓平板|安卓pad|平板电脑'),
     ('展陈制作/墙面工程/展墙/造型展墙', r'^(?!.*(?:服务器|影片|视频|转制|数字内容)).*(?:展墙|造型墙|背景墙|主题墙)'),
     ('展陈物料/标识与照明/标识/立体字', r'立体字|金属字|水晶字', r'^(?!.*发光)'),
     ('展陈物料/标识与照明/照明/环形灯具', r'^(?!.*灯箱).*(?:环.*led灯|圆.*led灯|环形灯|圆环灯)'),
@@ -58,7 +61,7 @@ RULES = (
     ('项目服务/物流与设备/交通运输/人员出行', r'人员交通|差旅交通|差旅机票'),
     ('项目服务/物流与设备/人员差旅/餐住', r'差旅', r'餐住|餐饮|住宿|餐食'),
     ('项目服务/物流与设备/人员差旅/范围未明', r'搭建差旅|安装差旅|人员差旅|^差旅$'),
-    ('项目服务/物流与设备/交通运输/物料货运', r'^运输(费)?$|物料运输|货运'),
+    ('项目服务/物流与设备/交通运输/物料货运', r'^运输(费)?$|物料运输|产品运输|展品运输|货运'),
     ('项目服务/物流与设备/设备租赁/剪叉式升降', r'剪刀升降车|剪叉式升降|剪叉车'),
     ('项目服务/物流与设备/设备租赁/曲臂式升降', r'曲臂车|曲臂式升降'),
     ('项目服务/物流与设备/设备租赁/装卸叉车', r'叉车'),
@@ -141,6 +144,9 @@ def quote_classification(name, context):
         return _routed_path(route,name)
     if re.search(r'地面保护|地毯保护|地板保护', name):
         return ('项目服务', '施工保障', '现场保护', '保护材料或围护组合')
+    exhibition = concept_path(name, context)
+    if exhibition:
+        return exhibition
     digital = digital_path(name, context)
     if digital:
         return digital

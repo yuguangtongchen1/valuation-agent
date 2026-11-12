@@ -96,6 +96,10 @@ def search(phrase, data=None, history=None, limit=10, worksheet=None):
 def compare(document, data=None, history=None, worksheet=None):
     engine, root, rows, ledger, duplicates, shared, catalog, metadata = load_history(data, history, worksheet)
     valuation, workbench = engine["valuation"], engine["workbench"]
+    from .source_identity import exclude_current_sources
+    rows = exclude_current_sources(rows, document)
+    retained_records = {row["record_id"] for row in rows}
+    ledger = {key: value for key, value in ledger.items() if key in retained_records}
     # Association failures and superseded configurations must never be priced references.
     usable = workbench.reference_pool(rows, allow_pending=metadata["mode"] == "provided_history")
     pending = workbench.pending_price_index(rows)

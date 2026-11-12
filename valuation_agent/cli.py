@@ -103,8 +103,29 @@ def main(argv=None):
     report.add_argument("input", type=Path)
     report.add_argument("--out", type=Path)
     report.add_argument("--threshold", default="0.15", help="偏高/偏低提示阈值，例如 0.15 代表 15%%")
+    library = commands.add_parser("library", help="私有供应商报价库：模型复核后入库、按供应商导出")
+    library.add_argument("action", choices=("ingest", "export"))
+    library.add_argument("--database", type=Path, required=True)
+    library.add_argument("--input", type=Path)
+    library.add_argument("--supplier")
+    library.add_argument("--exclude-source")
+    library.add_argument("--out", type=Path)
+    library.add_argument("--references-only", action="store_true", help="仅导出有价可比较分项，仍为供应商报价")
     args = parser.parse_args(argv)
     try:
+        if args.command == "library":
+            from .quote_library import ingest, export
+            if args.action == "ingest":
+                if not args.input:
+                    raise ValueError("入库需要 --input 模型复核后的 JSON")
+                result = ingest(json.loads(args.input.read_text(encoding="utf-8")), args.database)
+            else:
+                result = export(args.database, args.supplier, args.exclude_source, args.references_only)
+            if args.out:
+                write_json(args.out, result)
+            else:
+                print(json.dumps(result, ensure_ascii=False))
+            return
         if args.command == "handoff":
             from .handoff import write_command
             target=write_command(args.access_file.read_text().strip(), args.out, args.windows)

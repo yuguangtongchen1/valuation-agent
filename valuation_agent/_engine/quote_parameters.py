@@ -92,10 +92,28 @@ def _parameter_values(value, default_dimension_unit=''):
         ('帧率', rf'({NUMBER})\s*(?:fps|帧[/／]秒)', 'fps'),
         ('分辨率等级', r'(?<![a-z0-9])(2|4|8)\s*k(?![a-z])', 'K'),
     )
+    technical += (
+        ('光束角', rf'(?:光束角|发光角|配光角|beam\s*angle)\s*[:：]?\s*({NUMBER})\s*(?:°|度)?', '°'),
+        ('光通量', rf'({NUMBER})\s*(?:lm|流明)(?![a-z])', 'lm'),
+    )
     for label, pattern, unit in technical:
         for match in re.finditer(pattern, value):
             number = Decimal(match[1])
             output.setdefault(label, {})[number] = f'{match[1]} {unit}'
+    # A minimum requirement is not an exact measured value. Preserve the qualifier.
+    for match in re.finditer(rf'(?:显色指数|cri|ra)\s*[:：]?\s*(>=|≥|<=|≤|>|<|=)?\s*({NUMBER})', value):
+        qualifier = {'>=':'≥', '<=':'≤', '=':''}.get(match[1], match[1] or '')
+        amount = Decimal(match[2])
+        output.setdefault('显色指数', {})[(qualifier, amount)] = f'{qualifier}{match[2]} Ra'
+    for label, definitions in {
+        '调光协议': {'DALI':r'dali', 'DMX512':r'dmx(?:512)?', '0-10V':r'0\s*[-~至]\s*10\s*v', '可控硅':r'可控硅|triac'},
+        '网络线类别': {'CAT5e':r'cat\s*5e|超五类', 'CAT6':r'cat\s*6(?![a-z0-9])|(?<!超)六类', 'CAT6A':r'cat\s*6a|超六类'},
+        '投影方式': {'正投':r'正投', '背投':r'背投'},
+        '板材成型工艺': {'浇铸':r'浇铸板|浇注板', '挤出':r'挤出板'},
+    }.items():
+        for canonical, pattern in definitions.items():
+            if re.search(pattern, value):
+                output.setdefault(label, {})[canonical] = canonical
     for match in re.finditer(rf'({NUMBER})\s*(秒|分钟|min(?:ute)?s?|seconds?|secs?)', value):
         factor = 60 if match[2] in ('分钟', 'min', 'mins', 'minute', 'minutes') else 1
         output.setdefault('成片时长', {})[Decimal(match[1]) * factor] = f'{Decimal(match[1]) * factor} 秒'

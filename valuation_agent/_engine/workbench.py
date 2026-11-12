@@ -1,3 +1,4 @@
+from exhibition_knowledge import concept, bundle_relation, material_identities, material_identity_text
 import os
 """Read-only, source-prioritized adapter for the quotation workbench."""
 import argparse
@@ -120,8 +121,17 @@ def informative_spec(value):
 
 @lru_cache(maxsize=32768)
 def material_terms(value):
-    return {group[0]: next(term for term in group if term in value).replace('pvc', 'PVC').replace('pp背胶', 'PP背胶')
+    value = material_identity_text(value)
+    found = {group[0]: next(term for term in group if term in value).replace('pvc', 'PVC').replace('pp背胶', 'PP背胶')
             for group in SPEC_MATERIALS if any(term in value for term in group)}
+    aliases = material_identities(value)
+    for key in list(found):
+        if key in {'夹板', '多层板', '胶合板', '亚克力', '有机玻璃', '雪弗板', '雪佛板', 'PVC发泡板', '铝塑板', '铝塑复合板', '玻璃钢'}:
+            del found[key]
+    if 'PVC发泡板' in aliases and not re.search(r'pvc.*(?:地胶|地贴|管|卷材)', value):
+        found.pop('pvc', None)
+    found.update({key: key for key in sorted(aliases)})
+    return found
 
 
 @lru_cache(maxsize=32768)
@@ -229,7 +239,8 @@ def relationship(query, row, catalog_match=None):
             and not re.search(r'适配|反求|展开|楼体|多屏', historical_details)):
         return None
     class_match = comparable_class(current_path, historical_path, name, past)
-    bundle_reason = bundled_evidence(current_path, historical_path)
+    bundle_reason = bundled_evidence(current_path, historical_path) or bundle_relation(
+        concept(semantic_name(query, 'name'), context), concept(semantic_name(row, 'item_name'), historical_details))
     labor_partial = bool(re.search(r'电箱|电缆|配电', context) and past == '电工')
     catalog_bridge = bool(catalog_match and not (current_path and historical_path))
     hardware_paths = (current_path[:2] == ('展陈物料', '多媒体硬件')
@@ -404,10 +415,10 @@ def relationship(query, row, catalog_match=None):
     elif same_model:
         tier, label = 1, '同型号'
         reason = f'两条明细的型号一致：{"+".join(sorted(current_models))}'
-    elif same_spec and (class_match or family or near or name == past or same_bundle):
+    elif same_spec and not conflict and (class_match or family or near or name == past or same_bundle):
         tier, label = 2, '同规格'
         reason = '两条明细的规格一致，名称或组合相关'
-    elif same_parameters and (class_match or family or near or name == past or same_bundle):
+    elif same_parameters and not conflict and (class_match or family or near or name == past or same_bundle):
         tier, label = 2, '参数一致'
         reason = '已识别的参数换算后相同，名称或组合相关'
     elif same_bundle and (class_match or family or near or name == past):
@@ -461,6 +472,17 @@ COMPONENT_ALIASES = ({'船舵', '舵轮'}, {'游泳圈', '救生圈'})
 def quoted_components(query):
     """Read explicit lists, leaving dimensions and unitemized prose at package level."""
     components = {}
+    # Codex may interpret nonstandard prose, but each explicit component needs an
+    # exact source span. This is candidate scope, never an allocated component price.
+    evidence = ' '.join(str(query.get(k) or '') for k in ('description','configuration','source_description_unabridged'))
+    for part in query.get('comparison_components') or []:
+        if not isinstance(part, dict):
+            continue
+        name, span = str(part.get('name') or '').strip(), str(part.get('source_text') or '').strip()
+        clauses = re.split(r'[，,；;。\n]', evidence)
+        positive_span = any(span in clause and not re.search(r'不含|不包含|不包括|不提供|另计|甲供|甲方提供', clause) for clause in clauses) if span else False
+        if name and len(name) <= 120 and span and positive_span:
+            components[name] = (part.get('quantity'), part.get('unit'))
     for field in ('configuration', 'description'):
         parts = re.split(r'[，,、；;＋+\n]', str(query.get(field) or ''))
         found = {}
@@ -497,11 +519,21 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
             past = norm(row['item_name'])
             core = COMPONENT_VARIANT.sub('', past)
             related = any(norm(name) in aliases and core in aliases for aliases in COMPONENT_ALIASES)
-            if past != norm(name) and core != norm(name) and not related:
+            current_concept, old_concept = concept(norm(name)), concept(past, str(row.get('description') or '') + ' ' + str(row.get('spec') or ''))
+            semantic_related = bool(current_concept and old_concept and current_concept[0] == old_concept[0]
+                                    and not re.search(r'[+＋]|整包|组合|套装|及|与', past))
+            if past != norm(name) and core != norm(name) and not related and not semantic_related:
                 continue
-            label = '同名子件' if past == norm(name) else '相近子件'
-            relation = ((0 if past == norm(name) else 1, 0), label, [], [],
-                        f'当前组合中的“{name}”对应历史独立报价项“{row["item_name"]}”', [], None)
+            label = '同名子件' if past == norm(name) else '同类子件' if semantic_related else '相近子件'
+            component_relation = relationship({'name': name, 'unit': query.get('unit')}, row)
+            if component_relation is None and (current_concept or old_concept):
+                continue
+            differences = list(component_relation[2]) if component_relation else []
+            spec_differences = list(component_relation[3]) if component_relation else []
+            reason = f'当前组合中的“{name}”检索到历史子件“{row["item_name"]}”；仅作部分参考，不代表整组报价'
+            relation = ((0 if past == norm(name) else 1, 0), label, differences, spec_differences,
+                        reason, component_relation[5] if component_relation else [],
+                        component_relation[6] if component_relation else None)
         else:
             relation = relationship(query, row, catalog_candidates.get(row['line_id']))
         if relation:

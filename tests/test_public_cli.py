@@ -182,7 +182,11 @@ class PublicCLI(unittest.TestCase):
                      "model": "DEMO-WHOLE-SERVICE", "spec": "合成整项交付",
                      "record_status": "whole_scope_source_checked"}
             write_json(data / "quote-records.json", [row, whole])
-            whole_result = compare({"rows": [{**whole, "scope": whole["module"]}]}, data=data)
+            own_result = compare({"rows": [{**whole, "scope": whole["module"]}]}, data=data)
+            self.assertEqual(own_result["rows"][0]["references"], [])
+            new_quote = {k: whole[k] for k in ("item_name", "model", "spec", "unit", "currency")}
+            new_quote["scope"] = whole["module"]
+            whole_result = compare({"rows": [new_quote]}, data=data)
             self.assertEqual(whole_result["rows"][0]["references"][0]["comparison_role"], "package")
             self.assertEqual(assessment(whole_result["rows"][0])["status"], "仅供参考")
             self.assertIsNone(json.loads((data / "quote-records.json").read_text())[1]["line_id"])
