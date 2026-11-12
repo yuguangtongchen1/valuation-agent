@@ -34,3 +34,13 @@ class RemoteGuardTests(unittest.TestCase):
   with patch('valuation_agent.remote.remote_call',return_value=response):
    result=remote_compare({'rows':[{'item_name':'金属立体字'}]},'unused')
   self.assertEqual([r['item_name'] for r in result['rows'][0]['references']],['金属立体字'])
+
+class ProcurementObjectTests(unittest.TestCase):
+ def test_wall_is_not_shoelace_or_media(self):
+  relation=modules()['workbench'].relationship
+  query={'name':'多段弧形展墙','description':'金属烤漆饰面、钢架支撑'}
+  for name in ('鞋带制作','造型墙LED服务器','序厅门头主题墙面影片转制'):
+   self.assertIsNone(relation(query,{'item_name':name,'spec':'金属喷漆'}))
+  self.assertIsNotNone(relation(query,{'item_name':'烤漆铝板造型墙','spec':'金属喷漆'}))
+ def test_ring_light_is_not_lightbox(self):
+  self.assertIsNone(modules()['workbench'].relationship({'name':'可调圆形嵌入式LED灯'}, {'item_name':'装饰-背面圆环灯箱和'}))

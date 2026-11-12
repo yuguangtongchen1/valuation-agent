@@ -1,6 +1,6 @@
 """Stage and back up matching modules only; never restart services or edit data."""
 import argparse, ast, datetime, pathlib, shutil, subprocess
-p=argparse.ArgumentParser();p.add_argument('root');p.add_argument('revision');a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('root');p.add_argument('revision');p.add_argument('--source');a=p.parse_args()
 root=pathlib.Path(a.root).resolve(); engine=root/'valuation_agent'/'_engine'
 assert engine.is_dir(), 'Existing engine directory required'
 files=('workbench.py','quote_classification.py')
@@ -9,7 +9,7 @@ backup.mkdir()
 staged={}
 for name in files:
     url=f'https://raw.githubusercontent.com/yuguangtongchen1/valuation-agent/{a.revision}/valuation_agent/_engine/{name}'
-    payload=subprocess.check_output(['curl','-fsSL','--retry','2','--max-time','45',url])
+    payload=(pathlib.Path(a.source)/'valuation_agent'/'_engine'/name).read_bytes() if a.source else subprocess.check_output(['curl','-fsSL','--retry','2','--max-time','45',url])
     ast.parse(payload,filename=name)
     staged[name]=payload
     shutil.copy2(engine/name,backup/name)
