@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from .activation import parse_access_code
 
-RELEASE = "bd1d2cc532c661c1b15d84955358d758f98f29a6"
+RELEASE = "67d276ca5a1ff0ce23b9dc2db57cd14c0ebc66e3"
 
 def write_command(code, output, windows=False):
     parse_access_code(code)
