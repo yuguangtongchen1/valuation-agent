@@ -1,8 +1,8 @@
 'use strict';
-const installation = "python3 -c \"import pathlib,venv,os,subprocess;d=pathlib.Path.home()/'.valuation-agent/workbench';venv.create(d,with_pip=True);p=str(d/('Scripts/python.exe' if os.name=='nt' else 'bin/python'));subprocess.run([p,'-m','pip','install','valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/refs/tags/v0.2.16'],check=True);subprocess.run([p,'-m','valuation_agent.cli','launch'],check=True)\"";
+const installation = "python3 -c \"import pathlib,venv,os,subprocess;d=pathlib.Path.home()/'.valuation-agent/workbench';venv.create(d,with_pip=True);p=str(d/('Scripts/python.exe' if os.name=='nt' else 'bin/python'));subprocess.run([p,'-m','pip','install','valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/refs/tags/v0.2.17'],check=True);subprocess.run([p,'-m','valuation_agent.cli','launch'],check=True)\"";
 const codexPrompt = `请帮我安装并使用「估价 Agent」。
 
-先读取公开仓库 https://github.com/yuguangtongchen1/valuation-agent 的 README，以及 skills/procurement-estimation/SKILL.md，按当前说明安装 CLI 和 Skill。使用官网的一行命令在独立虚拟环境安装 0.2.16 和 [excel] 依赖，打开原版完整操作界面并保持进程运行。Windows 使用 py，macOS 使用 python3；需要 Python 3.9+ 和联网。不要只运行 demo 后结束。使用飞书链接时，按 Skill 主动检查并补齐 Node.js/npm 和飞书 CLI；运行 valuation-agent feishu-setup，完成接收方自己的飞书授权，再重试链接。首次在界面输入管理员单独发的 VA1. 访问码，之后可上传报价、整单比价、看明细和导出 Excel。若我在聊天提供了访问码，请通过标准输入交给 valuation-agent activate，不回显、不写进代码或公开仓库。
+先读取公开仓库 https://github.com/yuguangtongchen1/valuation-agent 的 README，以及 skills/procurement-estimation/SKILL.md，按当前说明安装 CLI 和 Skill。使用官网的一行命令在独立虚拟环境安装 0.2.17 和 [excel] 依赖，打开原版完整操作界面并保持进程运行。Windows 使用 py，macOS 使用 python3；需要 Python 3.9+ 和联网。不要只运行 demo 后结束。使用飞书链接时，按 Skill 主动检查并补齐 Node.js/npm 和飞书 CLI；运行 valuation-agent feishu-setup，完成接收方自己的飞书授权，再重试链接。首次在界面输入管理员单独发的 VA1. 访问码，之后可上传报价、整单比价、看明细和导出 Excel。若我在聊天提供了访问码，请通过标准输入交给 valuation-agent activate，不回显、不写进代码或公开仓库。
 
 若我已取得管理员提供的远程访问配置，优先使用 run --remote 完成比价、contract --remote 查看明细，输出 Excel 和 JSON；不要下载历史数据库，不要让我在聊天中粘贴 token，只使用配置文件路径。否则连接我提供且有访问权限的报价文件、历史合同或飞书资料。原始资料保存在我指定的位置。按项目 → 装置/服务 → BOM 明细保留包含关系；每行保留名称、型号、规格、组合、数量、单位、单价和金额。没有写明的字段保持缺失，不猜填。
 

@@ -49,3 +49,32 @@ class GatewaySecurity(unittest.TestCase):
   with self.assertRaisesRegex(ValueError,'HTTPS'):remote_call('search',{},p)
   p.chmod(0o644)
   with self.assertRaisesRegex(ValueError,'权限'):remote_call('search',{},p)
+
+class RemoteProvenanceTests(unittest.TestCase):
+ def test_gateway_excludes_current_family_and_superseded_rows(self):
+  from types import SimpleNamespace
+  from unittest.mock import Mock
+  rows=[{'record_id':'self','source_token':'file-a'},
+        {'record_id':'variant','source_token':'file-a','quotation_family_id':'family'},
+        {'record_id':'old','quotation_family_id':'family'},
+        {'record_id':'inactive','is_current_version':False},
+        {'record_id':'other','source_token':'file-b'}]
+  seen=[]
+  wb=SimpleNamespace(reference_pool=lambda r:r,pending_price_index=lambda r:{},source_name_index=lambda r:{},
+       lookup=lambda root,pool,*a,**kw:seen.extend(pool) or {'references':[]})
+  with tempfile.TemporaryDirectory() as tmp:
+   loaded=({'workbench':wb,'valuation':SimpleNamespace()},Path(tmp),rows,{r['record_id']:{} for r in rows},set(),set(),None,{})
+   app=Gateway(tmp,Path(tmp)/'unused',loader=lambda **kw:loaded)
+   try:app.dispatch('compare',{'document':{'rows':[{'item_name':'测试'}],'exclusion_sources':[{'source_token':'file-a'}]}})
+   finally:app.executor.shutdown(wait=True)
+  self.assertEqual([r['record_id'] for r in seen],['other'])
+
+ def test_client_preserves_cross_batch_source_identity(self):
+  from valuation_agent.cli import remote_compare
+  captured=[]
+  def call(action,payload,config):
+   captured.append(payload['document']);return {'rows':[{'quote':r,'references':[]} for r in payload['document']['rows']]}
+  document={'rows':[{'item_name':'测试','source_token':f'file-{i}'} for i in range(21)]}
+  with patch('valuation_agent.remote.remote_call',side_effect=call):remote_compare(document,'unused')
+  self.assertEqual(len(captured),2)
+  for d in captured:self.assertEqual(len(d['exclusion_sources']),21)

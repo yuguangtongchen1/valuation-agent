@@ -54,6 +54,22 @@ class Gateway:
             return {'record_id':rid,'lines':[safe_reference(valuation.reference(r,valuation.rejection(r,self.duplicates,self.shared)))for r in self.rows if r['record_id']==rid and (valuation.is_checked(r)or r.get('source_fields_reviewed'))]}
         document=payload.get('document');rows=document.get('rows')if isinstance(document,dict)else None
         if not isinstance(rows,list)or not 1<=len(rows)<=50:raise ValueError('One to fifty rows required')
+        from .source_identity import exclude_current_sources
+        identity_fields=('source_url','source_token','source_sha256','quotation_family_id','economic_purchase_group','record_id')
+        extra=document.get('exclusion_sources',[])
+        if not isinstance(extra,list) or len(extra)>1001:raise ValueError('Invalid source identities')
+        identities=[]
+        for item in [document]+rows+extra:
+            if not isinstance(item,dict):raise ValueError('Invalid source identity')
+            ident={k:item[k] for k in identity_fields if k in item}
+            if any(not isinstance(v,str) or len(v)>6000 for v in ident.values()):raise ValueError('Invalid source identity')
+            identities.append(ident)
+        retained=exclude_current_sources(self.rows,{'rows':identities})
+        pool=wb.reference_pool(retained)
+        pending=wb.pending_price_index(retained)
+        names=wb.source_name_index(retained)
+        retained_ids={r.get('record_id') for r in retained}
+        ledger={k:v for k,v in self.ledger.items() if k in retained_ids}
         output=[]
         for row in rows:
             if not isinstance(row,dict)or not isinstance(row.get('item_name'),str)or not 1<=len(row['item_name'].strip())<=120:raise ValueError('Invalid item name')
@@ -61,7 +77,7 @@ class Gateway:
             clean={k:row[k]for k in allowed if k in row}
             if any(not isinstance(v,(str,int,float,type(None)))or isinstance(v,bool)or len(str(v))>6000 for v in clean.values()):raise ValueError('Invalid field')
             query={**clean,'name':clean['item_name'],'currency':str(clean.get('currency')or'CNY').upper()}
-            found=wb.lookup(self.root,self.pool,self.ledger,self.duplicates,self.shared,query,False,pending=self.pending,catalog=self.catalog,source_names=self.names)
+            found=wb.lookup(self.root,pool,ledger,self.duplicates,self.shared,query,False,pending=pending,catalog=self.catalog,source_names=names)
             found['references']=[safe_reference(r)for r in found['references']]
             output.append({'quote':clean,**found})
         return {'schema_version':1,'project':str(document.get('project',''))[:200],'history':self.meta,'rows':output}
