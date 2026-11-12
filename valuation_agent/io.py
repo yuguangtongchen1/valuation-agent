@@ -12,15 +12,15 @@ from .engine import modules
 
 
 ALIASES = {
-    "item_name": ("item_name", "name", "名称", "物料", "物料名称", "材料名称", "产品名称", "服务名称"),
+    "item_name": ("item_name", "name", "名称", "物料", "物料名称", "材料名称", "产品名称", "服务名称", "项目／展项", "项目/展项", "工程名称", "报目名称"),
     "model": ("model", "型号", "产品型号"),
-    "spec": ("spec", "specification", "规格", "规格型号", "规格/型号", "规格 / 型号", "规格尺寸", "规格/尺寸", "尺寸mm"),
-    "description": ("description", "工艺说明", "工艺描述", "描述", "工作内容", "服务内容"),
+    "spec": ("spec", "specification", "规格", "规格型号", "规格/型号", "规格 / 型号", "规格尺寸", "规格/尺寸", "尺寸mm", "尺寸数量"),
+    "description": ("description", "工艺说明", "工艺描述", "描述", "工作内容", "服务内容", "制作工艺", "项目特征"),
     "configuration": ("configuration", "配置", "组合", "组合模式"),
     "quantity": ("quantity", "qty", "数量"),
     "unit": ("unit", "单位", "计价单位"),
-    "unit_price": ("unit_price", "单价", "原始单价"),
-    "subtotal": ("subtotal", "amount", "金额", "小计", "总价"),
+    "unit_price": ("unit_price", "单价", "原始单价", "综合单价"),
+    "subtotal": ("subtotal", "amount", "金额", "小计", "总价", "原表金额"),
     "currency": ("currency", "币种"),
     "supplier": ("supplier", "供应商", "乙方公司"),
     "project": ("project", "project_name", "项目", "项目名称"),
@@ -89,6 +89,44 @@ def table_rows(headers, values, start_row=2):
     return result
 
 
+def detect_table(matrix):
+    """Locate an explicit detail header; keep preceding summaries as evidence."""
+    for index, candidate in enumerate(matrix[:100]):
+        names = {str(v).strip().casefold() for v in candidate if v is not None}
+        named = any(a.casefold() in names for a in ALIASES['item_name'])
+        quantitative = any(a.casefold() in names for a in ALIASES['quantity'])
+        priced = any(a.casefold() in names or any(money_header(n, (a,)) for n in names)
+                     for a in ALIASES['unit_price'] + ALIASES['subtotal'])
+        if named and (quantitative or priced):
+            return table_rows(candidate, matrix[index+1:], index+2), [
+                {'kind': 'preamble', 'source_row': i+1, 'values': list(r)}
+                for i, r in enumerate(matrix[:index]) if any(v is not None for v in r)]
+    raise ValueError('未找到明确的报价明细表头；请由 Skill 结合上下文映射为 JSON，不能以汇总区代替明细')
+
+
+def enrich_mixed_fields(row, original):
+    """Extract only explicit counts; preserve composite pricing and source text."""
+    mixed = str(original.get('尺寸数量') or '').strip()
+    thickness = str(original.get('厚度参数') or '').strip()
+    if thickness:
+        row['spec'] = '；'.join(x for x in (row.get('spec'), thickness) if x)
+    if mixed:
+        counts = re.findall(r'(\d+(?:\.\d+)?)\s*(套|组|件|个|台)(?![\w])', mixed)
+        # Chinese characters are word characters too; accept punctuation/end after unit.
+        if len(counts) == 1 and row.get('quantity') is None and not row.get('unit'):
+            row['quantity'], row['unit'] = counts[0]
+            row['quantity_source'] = '尺寸数量原文明示'
+            if '预估' in mixed or '待定' in mixed:
+                row['quantity_status'] = 'estimated'
+        elif len(counts) > 1:
+            row['configuration'] = row.get('configuration') or mixed
+            row['import_notes'] = ['多规格组合：保留各子件数量，不分摊整行金额']
+    path = [str(original.get(k) or '').strip() for k in ('分类', '区域／展馆', '分项', '项目／展项')]
+    if any(path):
+        row['source_hierarchy'] = [part for part in path if part]
+    return row
+
+
 def read_input(path, worksheet=None):
     path = Path(path)
     metadata = {}
@@ -107,10 +145,7 @@ def read_input(path, worksheet=None):
     elif suffix == ".csv":
         with path.open(encoding="utf-8-sig", newline="") as stream:
             reader = csv.reader(stream)
-            headers = next(reader, None)
-            if headers is None:
-                raise ValueError("CSV 为空")
-            rows = table_rows(headers, reader)
+            rows, metadata['non_item_rows'] = detect_table(list(reader))
     elif suffix == ".xls":
         book = modules()["legacy"].legacy_xls_document(path.read_bytes())
         candidates = [s for s in book['sheets'] if not worksheet or s['name'] == worksheet]
@@ -121,7 +156,7 @@ def read_input(path, worksheet=None):
         sheet = candidates[0]
         if not sheet['rows']:
             raise ValueError("工作表为空")
-        rows = table_rows(sheet['rows'][0]['values'], (r['values'] for r in sheet['rows'][1:]))
+        rows, metadata['non_item_rows'] = detect_table([r['values'] for r in sheet['rows']])
         metadata['worksheet'] = sheet['name']
     elif suffix == ".xlsx":
         try:
@@ -135,19 +170,7 @@ def read_input(path, worksheet=None):
             if not worksheet and len(book.sheetnames) != 1:
                 raise ValueError("XLSX 有多个工作表，请用 --worksheet 指定，避免漏读")
             sheet = book[worksheet] if worksheet else book[book.sheetnames[0]]
-            iterator = sheet.iter_rows(values_only=True)
-            headers = None
-            for header_index, candidate in enumerate(iterator, 1):
-                if header_index > 30:break
-                names={str(v).strip().casefold() for v in candidate if v is not None}
-                has_name=any(a.casefold() in names for a in ALIASES['item_name'])
-                has_quantity=any(a.casefold() in names for a in ALIASES['quantity'])
-                has_price=any(a.casefold() in names or any(money_header(n,(a,)) for n in names) for a in ALIASES['unit_price']+ALIASES['subtotal'])
-                if has_name and (has_quantity or has_price):
-                    headers=candidate;break
-            if headers is None:
-                raise ValueError("前30行未找到明确的物料与数量/金额表头，请由 Skill 明确映射后转为JSON")
-            rows = table_rows(headers, iterator, header_index+1)
+            rows, preamble = detect_table(list(sheet.iter_rows(values_only=True)))
             items=[]; non_items=[]
             for source_row in rows:
                 filled={k:v for k,v in source_row.items() if k!='_input_row' and v is not None and str(v).strip()}
@@ -161,7 +184,7 @@ def read_input(path, worksheet=None):
                     non_items.append({'kind':'summary','source_original_fields':source_row});continue
                 items.append(source_row)
             rows=items
-            metadata['non_item_rows']=non_items
+            metadata['non_item_rows']=preamble + non_items
             metadata["worksheet"] = sheet.title
         finally:
             book.close()
@@ -173,6 +196,7 @@ def read_input(path, worksheet=None):
         raise ValueError("每条明细必须是 JSON 对象")
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     normalized = []
+    previous_source = None
     for index, original in enumerate(rows, 1):
         row = dict(original)
         keys = {str(k).strip().casefold(): k for k in original}
@@ -197,6 +221,14 @@ def read_input(path, worksheet=None):
                 raise ValueError(f"第 {index} 条 {field} 有多个冲突字段，请先明确映射：" + "、".join(k for k, _ in filled))
             value = filled[0][1] if filled else (matches[0][1] if matches else None)
             row[field] = value if field in MONEY else decimal_text(value, field) if field in NUMERIC else str(value).strip() if value is not None else ""
+        row = enrich_mixed_fields(row, original)
+        if not row['item_name'] and previous_source and original.get('制作工艺'):
+            group_keys = ('分类', '区域／展馆', '分项')
+            if original.get('分项') and all(original.get(k) == previous_source.get(k) for k in group_keys):
+                row['item_name'] = str(previous_source.get('项目／展项') or previous_source.get('项目/展项') or '')
+                row['name_source'] = '同分项前行名称延续；保留原空白值'
+                row['import_notes'] = row.get('import_notes', []) + ['名称延续，需结合前行确认方案关系']
+        previous_source = original
         if not row["item_name"]:
             raise ValueError(f"第 {index} 条缺物料/服务名称；不要把项目名称或备注当物料名称")
         row["project"] = row["project"] or str(metadata.get("project", ""))
