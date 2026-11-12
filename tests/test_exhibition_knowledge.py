@@ -112,4 +112,20 @@ class ExhibitionKnowledgeTests(unittest.TestCase):
         self.assertEqual(parameters('cri>=90'),parameters('ra≥90'))
         self.assertNotEqual(parameters('cri≥90'),parameters('cri90'))
 
-if __name__=='__main__':unittest.main()
+
+    def test_missing_and_different_units_are_not_direct_prices(self):
+        import json, tempfile
+        from pathlib import Path
+        from valuation_agent.service import compare
+        history={'rows':[{'item_name':'PVC地胶','quantity':'1','unit':'平方米',
+                         'unit_price':'30','subtotal':'30','currency':'CNY'}]}
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'history.json'
+            path.write_text(json.dumps(history,ensure_ascii=False))
+            for unit in (None, '项'):
+                with self.subTest(unit=unit):
+                    quote={'rows':[{'item_name':'PVC地胶','unit':unit,'currency':'CNY'}]}
+                    refs=compare(quote,history=path)['rows'][0]['references']
+                    self.assertTrue(refs)
+                    self.assertTrue(all(not r['price_comparison_eligible'] for r in refs))
+                    self.assertTrue(any('计价单位' in d for r in refs for d in r['differences']))

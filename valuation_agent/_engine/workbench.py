@@ -620,6 +620,9 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
         if view_only_variant(row):
             label += ' · 版本范围待核'
             differences.append('历史版本或适用范围不同，不计作独立成交样本')
+        if not current_unit or not row.get('unit'):
+            differences.append('计价单位未注明')
+            reason += '。计价单位缺失，仅保留范围参考，不直接比较单价'
         if current_unit and row.get('unit') and billing_unit(norm(row['unit'])) != current_unit:
             differences.append('计价单位不同')
             reason += f'。计价单位不同（当前：{query["unit"]}；历史：{row["unit"]}）'
