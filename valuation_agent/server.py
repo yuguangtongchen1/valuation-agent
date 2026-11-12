@@ -76,6 +76,11 @@ class Gateway:
             allowed=('item_name','spec','model','description','configuration','quantity','unit','currency','dimension_unit','row_id','source_locator','unit_price','subtotal')
             clean={k:row[k]for k in allowed if k in row}
             if any(not isinstance(v,(str,int,float,type(None)))or isinstance(v,bool)or len(str(v))>6000 for v in clean.values()):raise ValueError('Invalid field')
+            components=row.get('comparison_components',[])
+            if not isinstance(components,list) or len(components)>50:raise ValueError('Invalid components')
+            for component in components:
+                if not isinstance(component,dict) or any(not isinstance(v,(str,int,float,type(None))) or len(str(v))>6000 for v in component.values()):raise ValueError('Invalid component')
+            if components:clean['comparison_components']=components
             query={**clean,'name':clean['item_name'],'currency':str(clean.get('currency')or'CNY').upper()}
             found=wb.lookup(self.root,pool,ledger,self.duplicates,self.shared,query,False,pending=pending,catalog=self.catalog,source_names=names)
             found['references']=[safe_reference(r)for r in found['references']]
