@@ -20,6 +20,25 @@ def remote_compare(document,config):
     for start in range(0,len(document['rows']),20):
         rows=[{k:r[k] for k in fields if k in r} for r in document['rows'][start:start+20]]
         part=remote_call('compare',{'document':{'project':document.get('project',''),'rows':rows}},config)
+        # Older remote engines may promote unrelated rows solely due to scope warnings.
+        # Recheck those candidates with the same object-relevance rule used locally.
+        from .engine import modules
+        relation = modules()['workbench'].relationship
+        for query, item in zip(rows, part.get('rows', [])):
+            rejected = []
+            accepted = []
+            for ref in item.get('references', []):
+                kind = str(ref.get('match_kind') or '')
+                scope_only = '交易或作业范围参考' in kind or '整包旁证' in kind
+                if scope_only and relation({**query, 'name': query.get('item_name', '')}, ref) is None:
+                    rejected.append(ref.get('line_id') or ref.get('item_name'))
+                else:
+                    accepted.append(ref)
+            item['references'] = accepted
+            if rejected:
+                item['excluded_unrelated_references'] = rejected
+                if not accepted:
+                    item['reference_note'] = '已排除对象不相关的范围参考；尚未返回可比物料，需继续检索。'
         if result is None:result=part
         else:result['rows'].extend(part['rows'])
     return result

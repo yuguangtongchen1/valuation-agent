@@ -1,6 +1,6 @@
 """Input normalization retains original columns and does not infer missing prices."""
 import csv
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from functools import lru_cache
 import hashlib
 import json
@@ -127,6 +127,32 @@ def enrich_mixed_fields(row, original):
     return row
 
 
+def derive_unit_price(row):
+    """Compute a labelled price for a single stated billing quantity; retain source totals."""
+    if row.get('unit_price') not in (None, ''):
+        return row
+    if not str(row.get('unit') or '').strip() or row.get('quantity') in (None, '') or row.get('subtotal') in (None, ''):
+        return row
+    if row.get('configuration') or row.get('quantity_is_estimate'):
+        return row
+    try:
+        quantity, total = Decimal(str(row['quantity'])), Decimal(str(row['subtotal']))
+        if not quantity.is_finite() or not total.is_finite() or quantity <= 0 or total < 0:
+            return row
+        price = (total / quantity).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    except (InvalidOperation, ValueError):
+        return row
+    row['unit_price'] = format(price, 'f')
+    row['unit_price_source'] = '小计÷数量（计算值，保留两位小数）'
+    row['unit_price_calculation'] = {'subtotal': str(total), 'quantity': str(quantity),
+                                   'rounding': 'ROUND_HALF_UP', 'original_unit_price': None}
+    row['unit_price_amount_unit'] = '元'
+    row['unit_price_currency'] = row.get('subtotal_currency') or row.get('currency')
+    # Re-normalize derived money without inheriting old missing-price metadata.
+    row.get('money_normalization', {}).pop('unit_price', None)
+    return row
+
+
 def read_input(path, worksheet=None):
     path = Path(path)
     metadata = {}
@@ -239,6 +265,8 @@ def read_input(path, worksheet=None):
         row.setdefault("source_locator", f"{path.name}{source_sheet}:row {original.get('_input_row', index)}")
         row.setdefault("source_original_fields", original.get("source_original_fields", original))
         row.setdefault("source_evidence", {"file": path.name, "sha256": digest, "locator": row["source_locator"]})
+        row = modules()["money"].normalize_money_fields(row, metadata)
+        row = derive_unit_price(row)
         row = modules()["money"].normalize_money_fields(row, metadata)
         normalized.append(row)
     return {"schema_version": 1, "project": metadata.get("project", ""), "currency": metadata.get("currency", ""),

@@ -357,6 +357,15 @@ def relationship(query, row, catalog_match=None):
         digital_differences.append('历史视觉风格未注明，不能确认与当前制作风格相同')
     differences.extend(digital_differences)
     conflict = scope_conflict or bool(spec_differences) or bool(digital_differences)
+    # Scope warnings describe an already relevant object; they cannot establish relevance.
+    material_process_match = any(any(x in context for x in group) and
+                                 any(x in historical_details for x in group)
+                                 for group in REFERENCE_MATERIALS_AND_PROCESSES)
+    object_related = bool(same_model or class_match or bundle_reason or attribute_reason or
+                          catalog_bridge or digital_related or labor_partial or family or near or
+                          name == past or material_process_match)
+    if not object_related:
+        return None
     if historical_package and not re.search(r'整包|布景|套装',name):
         tier,label,reason=24,'整包旁证','历史价格覆盖多个物料或费用组成，当前项的独立计费依据需另核'
         differences.append('历史包含多个组成，仅覆盖当前项的一部分')
