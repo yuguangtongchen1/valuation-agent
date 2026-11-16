@@ -70,6 +70,17 @@ class GatewaySecurity(unittest.TestCase):
   self.assertEqual(result['lines'][0]['record_id'],'original')
   self.assertEqual(result['lines'][0]['item_name'],'人物骨骼绑定')
   self.assertEqual(len(self.app.rows),2)
+ def test_source_readability_does_not_remove_price_exclusion(self):
+  from valuation_agent.engine import modules
+  engine=modules()
+  row={'kind':'bom_line','record_id':'r','line_id':'pending',
+       'item_name':'现场保驾服务','currency':'HKD','subtotal':'23520',
+       'source_fields_reviewed':True,'record_status':'line_fields_verified_price_scope_pending',
+       'exclude_from_procurement_price_comparison':True}
+  public=safe_reference(engine['valuation'].reference(row,None))
+  self.assertTrue(public['source_fields_reviewed'])
+  self.assertTrue(public['exclude_from_procurement_price_comparison'])
+  self.assertEqual(engine['workbench'].reference_pool([row]),[])
  def test_client_rejects_http_and_insecure_config(self):
   p=Path(self.temp.name)/'client.json';p.write_text(json.dumps({'endpoint':'http://example.com','token':self.token}));p.chmod(0o600)
   with self.assertRaisesRegex(ValueError,'HTTPS'):remote_call('search',{},p)
