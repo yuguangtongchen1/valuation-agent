@@ -68,7 +68,7 @@ export async function comparisonWorkbook(quote, lookup = api, observed = {}) {
  current.addRow(['项目','源行','物料','规格','数量','单位','币种','单价（人民币元）','小计（人民币元）','历史报价条数','关联台账条数','状态','型号','组合方式','子件参考条数','整包旁证条数','当前归类','同细类待核记录','工艺旁证条数']);
  references.addRow(['当前源行','当前物料','历史项目或台账','供应商','匹配类型','规格 / 型号','币种','单位','单价（人民币元）','差异','合同','原件位置','原件链接','匹配依据','参考子件','当前子件数量','当前子件单位','当前归类','历史归类','价格类型','范围 / 子件参考金额（人民币元）','报价版本','独立样本标识']);
  for(const [i,line] of quote.lines.entries()){
-  const result=observed[line.id]||results[i];
+  const result=results[i];
   const matches=result.references;
   const history=matches.filter(r=>r.kind!=='ledger_match');
   const priced=history.length;

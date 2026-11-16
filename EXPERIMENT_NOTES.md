@@ -31,3 +31,5 @@ Parser regressions distinguish engraving depth from substrate thickness, and sco
 
 ## 0.2.22 旧报价兼容修复
 真实 Chrome 验收发现缺 projectId 的旧 handoff 记录导致 ImportDialog startsWith 崩溃。已保护导入筛选、规则列表和统计，并为新 handoff 明细补一致的未关联标识；未清空浏览器数据。Node 回归 3 项通过，87 条报价和远程历史明细已在原版界面显示。
+
+导出一致性：发现旧 observed 缓存覆盖最新 batch 结果，现统一以本次查询为准。新增 Excel 回读测试，验证旧参考不会混入新导出；Node 4 项通过。
