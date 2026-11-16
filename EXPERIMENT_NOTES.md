@@ -14,3 +14,11 @@ Validated locally on 2026-11-16.
 Private evaluation artifacts and source images are retained outside this public repository. The 87-line remote evaluation returned references for 71 lines after source-backed service decomposition (279 references). This is coverage, not an accuracy score; 16 lines remain unmatched. Composite service matches are partial references, not allocated package prices.
 
 The valuation service alone was deployed from revision 284cf0b. Chrome verification covered quotation loading, comparison, contract detail, an original Feishu document, and Excel export. The embedded right-hand Codex panel was not exposed by the browser tool and is not visually verified. Later changes update the Skill, regression tests, and frozen installation commands; they do not alter the deployed matching engine.
+
+## 2026-11-16 component follow-up (054e176)
+
+The valuation service alone was updated from revision 054e176, with a code backup retained. Two authorized rotary-platform rows were sent to the real service; no images or contracts were transmitted. The first row now recalls a custom leisure seat as a partial seating reference, alongside a steel-frame reference. The second returns a steel-frame reference. All returned references have price_comparison_eligible=false. Original input unit prices and subtotals were unchanged.
+
+The structured index contained 7,745 rows, including 6,702 eligible price rows. There were no same-source rows in this particular live index, so zero self references does not by itself prove source exclusion. A separate gateway regression fixture covers current source, earlier same-family versions, inactive versions and independent evidence. Activity stairs and display props remain unmatched; neither row has a whole-platform reference. This is not proof of full quotation accuracy or complete image extraction.
+
+The 13 targeted regression tests passed again. Release 0.2.21 is being prepared so frozen installer URLs and the update manifest can deliver these changes; publication and clean installation must be verified separately. Windows real-device acceptance remains unverified.
