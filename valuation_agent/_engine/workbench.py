@@ -601,6 +601,8 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
         if relation:
             candidates.append((row, relation))
     counts['semantic_candidates'] = len(candidates)
+    counts['semantic_rejected'] = (counts['rows_examined'] - counts['blocked_price_roles']
+        - counts['excluded_or_already_selected'] - counts['semantic_candidates'])
     current_unit = billing_unit(norm(query.get('unit')))
     query_path = line_classification(query, 'name', ('name', 'spec', 'description', 'configuration'))
     def family_distance(candidate):
@@ -723,6 +725,8 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
         if len(result) == (1 if component else 6):
             break
     counts['returned'] = len(result)
+    counts['candidates_beyond_return_limit'] = (len(candidates) - len(result)
+        - counts['duplicates_removed'])
     counts['return_limit'] = 1 if component else 6
     if trace is not None:
         trace.append(counts)
@@ -731,8 +735,10 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
 
 def lookup(root, checked, ledger, duplicates, shared, query, live, pending=None, catalog=None, source_names=None):
     name = str(query.get('name', '')).strip()
-    if not name or len(name) > 120:
-        return {'references': [], 'fallback_complete': True}
+    if not name:
+        raise ValueError('物料名称不能为空')
+    if len(name) > 120:
+        raise ValueError('物料名称超过 120 字；请把工艺、规格和项目背景放入独立字段')
     path = line_classification(query, 'name', ('name', 'spec', 'description', 'configuration'))
     partials = []
     search_trace = []

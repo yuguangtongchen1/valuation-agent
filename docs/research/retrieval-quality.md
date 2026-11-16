@@ -6,6 +6,8 @@
 
 远程 compare 返回 retrieval_corpus：historical_rows = same_source_rows + other_inactive_version_rows + retained_rows；retained_rows = eligible_price_rows + other_retained_rows。这些是资格统计，不是准确率、召回率或原件视觉审计覆盖率。
 
+每次检索的 retrieval_passes 区分扫描行、价格角色排除、同源或已选排除、语义未匹配、候选、已处理重复和超出展示上限的候选。超出上限的候选尚未完成展示阶段去重，不能当作独立样本数。空名称及超长名称明确报错，不再返回“检索完成但无参考”。
+
 ## 后续实验，不代表已经实现
 
 1. 切片：按项目→合同→报价版本→装置/服务→计价行→组合子件组织；图片按锚定行和图示部位关联，父项总价不可复制给子件。
