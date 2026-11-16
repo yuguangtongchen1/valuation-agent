@@ -69,3 +69,20 @@ class EtchingDepthTests(unittest.TestCase):
         compared = {row['label']: row for row in parameter_comparison(current, historical)}
         self.assertFalse(compared['厚度']['different'])
         self.assertTrue(compared['蚀刻深度']['different'])
+
+class LowercaseGlyphTests(unittest.TestCase):
+    def test_capital_and_lowercase_heights_compare_independently(self):
+        current = parameters('中文字高33mm；英文大写字高31mm；英文小写字高21mm')
+        history = parameters('中文字高3.3cm；英文大写字高3.1cm；英文小写字高2.2cm')
+        result = {r['label']: r for r in parameter_comparison(current, history)}
+        self.assertEqual(set(result), {'中文字高', '英文大写字高', '英文小写字高'})
+        self.assertFalse(result['英文大写字高']['different'])
+        self.assertTrue(result['英文小写字高']['different'])
+
+    def test_numeric_glyphs_keep_language_scope(self):
+        a = parameters('中文字高152mm；中文数字字高330mm；英文数字字高147mm')
+        b = parameters('中文字高15.2cm；中文数字字高33cm；英文数字字高15cm')
+        result = {r['label']: r for r in parameter_comparison(a, b)}
+        self.assertEqual(set(result), {'中文字高', '中文数字字高', '英文数字字高'})
+        self.assertFalse(result['中文数字字高']['different'])
+        self.assertTrue(result['英文数字字高']['different'])
