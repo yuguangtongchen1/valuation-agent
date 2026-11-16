@@ -29,3 +29,20 @@ class ObjectScopedParametersTests(unittest.TestCase):
         result = parameters('中文大标题字高250mm；英文副标题字高60mm；中文正文字高30mm')
         self.assertEqual(set(result), {'中文大标题字高', '英文副标题字高', '中文正文字高'})
         self.assertEqual(list(result['中文正文字高']), [30])
+
+    def test_explicit_objects_keep_separate_body_heights(self):
+        result = parameters('【对象：入口墙】中文正文字高46mm；【对象：时间墙】中文正文字高35mm')
+        self.assertEqual(set(result), {'入口墙 · 中文正文字高', '时间墙 · 中文正文字高'})
+        self.assertEqual(list(result['入口墙 · 中文正文字高']), [46])
+        self.assertEqual(list(result['时间墙 · 中文正文字高']), [35])
+
+    def test_object_parameters_compare_equivalent_units(self):
+        current = parameters('【对象：入口墙】中文正文字高46mm')
+        history = parameters('【对象：入口墙】中文正文字高4.6cm；【对象：时间墙】中文小文字字高35mm')
+        result = {r['label']: r for r in parameter_comparison(current, history)}
+        self.assertFalse(result['入口墙 · 中文正文字高']['different'])
+        self.assertEqual(result['时间墙 · 中文小文字字高']['current'], '')
+
+    def test_unscoped_wall_and_missing_units_survive_object_sections(self):
+        result = parameters('墙面范围：6000×3000mm；【对象：入口墙】中文字高32；【对象：时间墙】中文字高35mm')
+        self.assertEqual(set(result), {'墙面范围', '时间墙 · 中文字高'})

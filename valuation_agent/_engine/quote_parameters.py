@@ -48,6 +48,17 @@ def parameters(value, default_dimension_unit=''):
 
 @lru_cache(maxsize=32768)
 def _parameter_values(value, default_dimension_unit=''):
+    # Explicit source-object boundaries are supplied by source review, never
+    # inferred from a bare number or drawing identifier. Keep their parameters
+    # separate so two different objects cannot silently share a dimension.
+    object_sections = list(re.finditer(r'【对象[：:]([^】]+)】', value))
+    if object_sections:
+        result = parameters(value[:object_sections[0].start()], default_dimension_unit)
+        for index, section in enumerate(object_sections):
+            end = object_sections[index + 1].start() if index + 1 < len(object_sections) else len(value)
+            for label, entries in parameters(value[section.end():end], default_dimension_unit).items():
+                result.setdefault(f'{section[1].strip()} · {label}', {}).update(entries)
+        return tuple((label, tuple(entries.items())) for label, entries in result.items())
     # Some original dimension cells omit a separator between two labelled axes.
     value = normalize_specification_text(value.lower())
     # Suffix axes occur in drawings (3000L×1800W). Require a chain so a
@@ -59,7 +70,7 @@ def _parameter_values(value, default_dimension_unit=''):
     # Explicit object labels must survive normalization: a glyph height is not
     # the height of the wall carrying it. Remove these spans before generic axes.
     scoped = re.compile(
-        rf'(?P<label>中文大标题字高|英文副标题字高|中文正文字高|中文字高|英文大写字高|英文字高|字高|墙面高度|墙面长度|墙面宽度)'
+        rf'(?P<label>中文大标题字高|英文副标题字高|中文正文字高|中文小文字字高|中文字高|英文大写字高|英文字高|字高|墙面高度|墙面长度|墙面宽度)'
         rf'\s*[:：=]?\s*(?P<number>{NUMBER})\s*(?P<unit>{LENGTH_UNIT})?'
         r'(?![a-z\d.])'
     )
