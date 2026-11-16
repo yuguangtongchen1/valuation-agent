@@ -16,7 +16,7 @@ macOS / Linux：
 
 ```sh
 python3 -m venv .valuation-env
-.valuation-env/bin/python -m pip install --upgrade 'valuation-agent[excel] @ git+https://github.com/yuguangtongchen1/valuation-agent.git'
+.valuation-env/bin/python -m pip install --upgrade 'valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/f96a347c7a1dba6befff212b080ba2b8d8336d6b'
 .valuation-env/bin/valuation-agent launch
 ```
 
@@ -24,7 +24,7 @@ Windows（PowerShell）：
 
 ```powershell
 py -m venv .valuation-env
-.\.valuation-env\Scripts\python.exe -m pip install --upgrade "valuation-agent[excel] @ git+https://github.com/yuguangtongchen1/valuation-agent.git"
+.\.valuation-env\Scripts\python.exe -m pip install --upgrade "valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/f96a347c7a1dba6befff212b080ba2b8d8336d6b"
 .\.valuation-env\Scripts\valuation-agent.exe launch
 ```
 
@@ -42,7 +42,7 @@ Python 3.9 或以上。建议使用独立环境：
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade 'valuation-agent[excel] @ git+https://github.com/yuguangtongchen1/valuation-agent.git'
+.venv/bin/python -m pip install --upgrade 'valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/f96a347c7a1dba6befff212b080ba2b8d8336d6b'
 .venv/bin/valuation-agent demo --output-dir ./demo-output
 ```
 
@@ -81,7 +81,7 @@ valuation-agent report ./comparison.json --out ./advice.md
 支持 JSON、UTF-8 CSV；安装可选依赖后支持 XLSX / XLS：
 
 ```sh
-python3 -m pip install "valuation-agent[excel] @ git+https://github.com/yuguangtongchen1/valuation-agent.git"
+python3 -m pip install "valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/f96a347c7a1dba6befff212b080ba2b8d8336d6b"
 valuation-agent import ./quotation.xlsx --worksheet 报价 --out ./quote.json
 ```
 

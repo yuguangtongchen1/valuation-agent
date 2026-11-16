@@ -125,8 +125,6 @@ def compare(document, data=None, history=None, worksheet=None):
                 if key in original:
                     ref[key] = original[key]
             # No deployment-specific URL is inferred by the portable wrapper.
-            if not workbench.GITHUB:
-                ref["source_url"] = None
             if ref.get("kind") == "whole_scope_quote":
                 ref["comparison_role"] = "package"
         output.append({"quote": row, **found})

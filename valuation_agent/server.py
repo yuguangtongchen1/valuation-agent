@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from . import __version__,service
 
-REF_FIELDS=set('kind item_name spec model brand description unit quantity unit_price subtotal currency project project_key record_id contract_id line_id supplier owner signed_date source_locator source_name source_token record_status source_review_kind match_kind match_reason differences spec_differences parameters classification comparison_role price_comparison_eligible reference_price_type reference_total reference_total_cny_yuan unit_price_cny_yuan subtotal_cny_yuan ledger_amount_cny_tax_inclusive reference_rate_basis reference_rate_label reference_rate_unit reference_billing_multiplier reference_billing_multiplier_label component_name component_quantity component_unit quotation_variant_id quotation_variant_name independent_sample_key period billing_period'.split())
+REF_FIELDS=set('kind item_name spec model brand description unit quantity unit_price subtotal currency project project_key record_id contract_id line_id supplier owner signed_date source_locator source_name source_token source_url record_status source_review_kind match_kind match_reason differences spec_differences parameters classification comparison_role price_comparison_eligible reference_price_type reference_total reference_total_cny_yuan unit_price_cny_yuan subtotal_cny_yuan ledger_amount_cny_tax_inclusive reference_rate_basis reference_rate_label reference_rate_unit reference_billing_multiplier reference_billing_multiplier_label component_name component_quantity component_unit quotation_variant_id quotation_variant_name independent_sample_key period billing_period'.split())
 def safe_reference(row):return {key:value for key,value in row.items() if key in REF_FIELDS}
 def parse_json(raw):
     def unique(pairs):
@@ -76,6 +76,11 @@ class Gateway:
             allowed=('item_name','spec','model','description','configuration','quantity','unit','currency','dimension_unit','row_id','source_locator','unit_price','subtotal')
             clean={k:row[k]for k in allowed if k in row}
             if any(not isinstance(v,(str,int,float,type(None)))or isinstance(v,bool)or len(str(v))>6000 for v in clean.values()):raise ValueError('Invalid field')
+            components=row.get('comparison_components',[])
+            if not isinstance(components,list) or len(components)>50:raise ValueError('Invalid components')
+            for component in components:
+                if not isinstance(component,dict) or any(not isinstance(v,(str,int,float,type(None))) or len(str(v))>6000 for v in component.values()):raise ValueError('Invalid component')
+            if components:clean['comparison_components']=components
             query={**clean,'name':clean['item_name'],'currency':str(clean.get('currency')or'CNY').upper()}
             found=wb.lookup(self.root,pool,ledger,self.duplicates,self.shared,query,False,pending=pending,catalog=self.catalog,source_names=names)
             found['references']=[safe_reference(r)for r in found['references']]
