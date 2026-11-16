@@ -9,7 +9,9 @@ const codexPrompt = `请帮我安装并使用「估价 Agent」。
 对新报价先按用途、材质、型号、工艺和组合检索，再逐项核对范围和计费单位。分别显示同类参考、规格差异、整包参考和部分子件参考，说明匹配理由，并保留可回查的来源。
 
 只输出清晰的比价表，不在表格下面附加采购建议或长篇分析。表中列出当前物料、规格配置、当前报价、匹配的历史物料、参考价格与计价方式、供应商、差异及匹配范围。金额统一人民币元；按已确认财务依据展示换算金额，原币读数保留在来源中。整包、分项、每人月费和每场单价分别显示；未命中时在该行写清缺哪类证据，不直接认定完全非标。保持可回查来源，不擅自写回我的原表。`;
-const copies = {install:installation,demo:installation,prompt:codexPrompt};
+const upgradeCommand = "python3 -c \"import urllib.request;exec(compile(urllib.request.urlopen('https://yuguangtongchen1.github.io/valuation-agent/upgrade.py',timeout=30).read(),'valuation-upgrade','exec'))\"";
+const copies = {install:installation,demo:installation,prompt:codexPrompt,upgrade:upgradeCommand,upgradeWindows:upgradeCommand.replace(/^python3/,'py')};
+for(const node of document.querySelectorAll('[data-upgrade-command]'))node.textContent=upgradeCommand;
 for(const node of document.querySelectorAll('[data-install-command]'))node.textContent=installation;
 for (const button of document.querySelectorAll('[data-copy]')) {
  button.addEventListener('click', async () => {
@@ -22,12 +24,9 @@ for (const button of document.querySelectorAll('[data-copy]')) {
     area.style.position='fixed';area.style.top='0';area.style.left='0';area.style.width='1px';area.style.height='1px';
     document.body.append(area);area.select();const ok=document.execCommand('copy');area.remove();button.focus();if(!ok)throw Error('copy');
    }
-   const original=button.dataset.copy==='prompt'?'复制使用提示词':'复制';
-   for (const other of document.querySelectorAll('[data-copy]')) other.textContent=other.dataset.copy==='prompt'?'复制使用提示词':'复制';
-   button.textContent='已复制 ✓';button.setAttribute('aria-label',original+'，已复制');
-   const originalLabel=button.innerHTML;
-   button.textContent=button.dataset.copy==='prompt'?'已复制，粘贴到 Codex':'已复制';
-   setTimeout(()=>{button.innerHTML=originalLabel;},2500);
+   if(!button.dataset.originalLabel)button.dataset.originalLabel=button.textContent;
+   button.textContent='已复制 ✓';
+   setTimeout(()=>{button.textContent=button.dataset.originalLabel;},2500);
    if(status) status.textContent=button.dataset.copy==='prompt'?'已复制提示词，粘贴到 Codex 即可。':'已复制命令，粘贴到终端运行。';
   } catch {
    if(status) status.textContent='自动复制未成功，请选择下方命令或指南中的提示词手动复制。';
