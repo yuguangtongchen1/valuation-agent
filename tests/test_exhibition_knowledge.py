@@ -11,6 +11,22 @@ class ExhibitionKnowledgeTests(unittest.TestCase):
         for current, old in pairs:
             with self.subTest(current=current):
                 self.assertIsNotNone(self.relation({'name':current},{'item_name':old}))
+    def test_new_graphic_and_stone_scopes(self):
+        from exhibition_knowledge import concept
+        from quote_classification import classify_row
+        cases = [('灰色天然石材底座。', 'stone_plinth'),
+                 ('做旧金属板，文字蚀刻镀深金色', 'metal_etch_graphic'),
+                 ('哑光银色热转印文字', 'thermal_graphic')]
+        for name, expected in cases:
+            self.assertEqual(concept(name)[0], expected)
+            self.assertTrue(classify_row({'item_name': name}))
+        for a, b in [('哑光银色热转印文字', '丝网印文字'),
+                     ('做旧金属板文字蚀刻', '金属立体字'),
+                     ('天然石材底座', '电机石材底座')]:
+            self.assertIsNone(self.relation({'name': a}, {'item_name': b}))
+        for name in ['热转印图文打印机', '金属蚀刻标牌加工机', '天然石材电机底座']:
+            self.assertIsNone(concept(name))
+
     def test_distinct_deliverables(self):
         pairs = [('吊挂钢结构','LED钢结构'),('中控系统','播放服务器'),('多功能展陈系统','弧形展墙'),
                  ('轨道射灯','轨道接头'),('展柜','展柜灯带'),('定向扬声器','普通音箱'),
