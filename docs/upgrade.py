@@ -37,9 +37,9 @@ def main():
             shutil.copy2(source, backup / name)
             (backup / name).chmod(0o600)
     subprocess.run([str(python), '-m', 'pip', 'install', '--upgrade',
-        'valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.21'], check=True)
+        'valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.22'], check=True)
     actual = subprocess.check_output([str(python), '-I', '-m', 'valuation_agent.cli', '--version'], text=True).strip()
-    if actual != '0.2.21':
+    if actual != '0.2.22':
         raise SystemExit('版本核验失败，未改启动地址。')
     (config / 'workbench-port.json').write_text(json.dumps({'port': url.port}), encoding='utf-8')
     command = [str(python), '-I', '-m', 'valuation_agent.cli', 'launch']

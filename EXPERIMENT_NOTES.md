@@ -22,3 +22,9 @@ The valuation service alone was updated from revision 054e176, with a code backu
 The structured index contained 7,745 rows, including 6,702 eligible price rows. There were no same-source rows in this particular live index, so zero self references does not by itself prove source exclusion. A separate gateway regression fixture covers current source, earlier same-family versions, inactive versions and independent evidence. Activity stairs and display props remain unmatched; neither row has a whole-platform reference. This is not proof of full quotation accuracy or complete image extraction.
 
 The 13 targeted regression tests passed again. Release 0.2.21 is being prepared so frozen installer URLs and the update manifest can deliver these changes; publication and clean installation must be verified separately. Windows real-device acceptance remains unverified.
+
+## 0.2.22 specification extraction follow-up
+
+The 87 source quotation rows have completed row-level text/image review. Four additional shared-image associations were restored after checking merged cells and object identity. This is review coverage, not a claim that every source specifies dimensions. Financial input fields were preserved.
+
+Parser regressions distinguish engraving depth from substrate thickness, and scope title/body, uppercase/lowercase, and numeric glyph heights separately. The 129-test suite passed before the version change. Public release, runtime synchronization and browser acceptance must be checked independently; this note does not claim deployment.
