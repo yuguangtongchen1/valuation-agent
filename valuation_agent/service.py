@@ -97,11 +97,14 @@ def compare(document, data=None, history=None, worksheet=None):
     engine, root, rows, ledger, duplicates, shared, catalog, metadata = load_history(data, history, worksheet)
     valuation, workbench = engine["valuation"], engine["workbench"]
     from .source_identity import exclude_current_sources
-    rows = exclude_current_sources(rows, document)
+    corpus = {}
+    rows = exclude_current_sources(rows, document, diagnostics=corpus)
     retained_records = {row["record_id"] for row in rows}
     ledger = {key: value for key, value in ledger.items() if key in retained_records}
     # Association failures and superseded configurations must never be priced references.
     usable = workbench.reference_pool(rows, allow_pending=metadata["mode"] == "provided_history")
+    corpus['eligible_price_rows'] = len(usable)
+    corpus['other_retained_rows'] = len(rows) - len(usable)
     pending = workbench.pending_price_index(rows)
     names = workbench.source_name_index(rows)
     source_by_line = {row["line_id"]: row for row in rows}
@@ -129,7 +132,7 @@ def compare(document, data=None, history=None, worksheet=None):
                 ref["comparison_role"] = "package"
         output.append({"quote": row, **found})
     return {"schema_version": 1, "project": document.get("project", ""),
-            "synthetic": document.get("synthetic", False), "history": metadata,
+            "synthetic": document.get("synthetic", False), "history": metadata, "retrieval_corpus": corpus,
             "engine": "workbench.lookup / relationship / quote_classification", "rows": output}
 
 
