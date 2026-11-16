@@ -65,16 +65,35 @@ class RemoteProvenanceTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as tmp:
    loaded=({'workbench':wb,'valuation':SimpleNamespace()},Path(tmp),rows,{r['record_id']:{} for r in rows},set(),set(),None,{})
    app=Gateway(tmp,Path(tmp)/'unused',loader=lambda **kw:loaded)
-   try:app.dispatch('compare',{'document':{'rows':[{'item_name':'测试'}],'exclusion_sources':[{'source_token':'file-a'}]}})
+   try:result=app.dispatch('compare',{'document':{'rows':[{'item_name':'测试'}],'exclusion_sources':[{'source_token':'file-a'}]}})
    finally:app.executor.shutdown(wait=True)
   self.assertEqual([r['record_id'] for r in seen],['other'])
+  self.assertEqual(result['retrieval_corpus'],dict(historical_rows=5,same_source_rows=3,other_inactive_version_rows=1,retained_rows=1,eligible_price_rows=1,other_retained_rows=0))
 
  def test_client_preserves_cross_batch_source_identity(self):
   from valuation_agent.cli import remote_compare
   captured=[]
   def call(action,payload,config):
    captured.append(payload['document']);return {'rows':[{'quote':r,'references':[]} for r in payload['document']['rows']]}
-  document={'rows':[{'item_name':'测试','source_token':f'file-{i}'} for i in range(21)]}
+  document={'rows':[{'item_name':'测试','brand':'品牌甲','source_token':f'file-{i}'} for i in range(21)]}
   with patch('valuation_agent.remote.remote_call',side_effect=call):remote_compare(document,'unused')
   self.assertEqual(len(captured),2)
-  for d in captured:self.assertEqual(len(d['exclusion_sources']),21)
+  for d in captured:
+   self.assertEqual(len(d['exclusion_sources']),21)
+   self.assertTrue(all(r['brand']=='品牌甲' for r in d['rows']))
+
+ def test_gateway_preserves_brand_for_engine_conflict_check(self):
+  from types import SimpleNamespace
+  queries=[]
+  def lookup(root,pool,ledger,duplicates,shared,query,*a,**kw):
+   queries.append(query)
+   return {'references':[]}
+  wb=SimpleNamespace(reference_pool=lambda r:r,pending_price_index=lambda r:{},source_name_index=lambda r:{},lookup=lookup)
+  with tempfile.TemporaryDirectory() as tmp:
+   loaded=({'workbench':wb,'valuation':SimpleNamespace()},Path(tmp),[],{},set(),set(),None,{})
+   app=Gateway(tmp,Path(tmp)/'unused',loader=lambda **kw:loaded)
+   try:
+    result=app.dispatch('compare',{'document':{'rows':[{'item_name':'投影机','model':'X100','brand':'品牌甲'}]}})
+   finally:app.executor.shutdown(wait=True)
+  self.assertEqual(queries[0]['brand'],'品牌甲')
+  self.assertEqual(result['rows'][0]['quote']['brand'],'品牌甲')

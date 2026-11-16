@@ -64,8 +64,11 @@ class Gateway:
             ident={k:item[k] for k in identity_fields if k in item}
             if any(not isinstance(v,str) or len(v)>6000 for v in ident.values()):raise ValueError('Invalid source identity')
             identities.append(ident)
-        retained=exclude_current_sources(self.rows,{'rows':identities})
+        corpus={}
+        retained=exclude_current_sources(self.rows,{'rows':identities},diagnostics=corpus)
         pool=wb.reference_pool(retained)
+        corpus['eligible_price_rows']=len(pool)
+        corpus['other_retained_rows']=len(retained)-len(pool)
         pending=wb.pending_price_index(retained)
         names=wb.source_name_index(retained)
         retained_ids={r.get('record_id') for r in retained}
@@ -73,7 +76,7 @@ class Gateway:
         output=[]
         for row in rows:
             if not isinstance(row,dict)or not isinstance(row.get('item_name'),str)or not 1<=len(row['item_name'].strip())<=120:raise ValueError('Invalid item name')
-            allowed=('item_name','spec','model','description','configuration','quantity','unit','currency','dimension_unit','row_id','source_locator','unit_price','subtotal')
+            allowed=('item_name','spec','model','brand','description','configuration','quantity','unit','currency','dimension_unit','row_id','source_locator','unit_price','subtotal')
             clean={k:row[k]for k in allowed if k in row}
             if any(not isinstance(v,(str,int,float,type(None)))or isinstance(v,bool)or len(str(v))>6000 for v in clean.values()):raise ValueError('Invalid field')
             components=row.get('comparison_components',[])
@@ -85,7 +88,7 @@ class Gateway:
             found=wb.lookup(self.root,pool,ledger,self.duplicates,self.shared,query,False,pending=pending,catalog=self.catalog,source_names=names)
             found['references']=[safe_reference(r)for r in found['references']]
             output.append({'quote':clean,**found})
-        return {'schema_version':1,'project':str(document.get('project',''))[:200],'history':self.meta,'rows':output}
+        return {'schema_version':1,'project':str(document.get('project',''))[:200],'history':self.meta,'retrieval_corpus':corpus,'rows':output}
     async def __call__(self,scope,receive,send):
         if scope['type']=='lifespan':
             while True:

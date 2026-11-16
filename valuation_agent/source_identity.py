@@ -43,7 +43,7 @@ def identities(value):
     return result
 
 
-def exclude_current_sources(rows, document):
+def exclude_current_sources(rows, document, *, diagnostics=None):
     own=identities(document)
     for row in document.get('rows',[]):own.update(identities(row))
     # Traverse the provenance graph once. Each source alias and row is visited
@@ -67,5 +67,11 @@ def exclude_current_sources(rows, document):
             for linked in row_identities[index] - own:
                 own.add(linked)
                 queue.append(linked)
+    if diagnostics is not None:
+        inactive = sum(index not in excluded and row.get('is_current_version') is False
+                       for index, row in enumerate(rows))
+        diagnostics.update(historical_rows=len(rows), same_source_rows=len(excluded),
+                           other_inactive_version_rows=inactive,
+                           retained_rows=len(rows)-len(excluded)-inactive)
     return [row for index, row in enumerate(rows)
             if index not in excluded and row.get('is_current_version') is not False]
