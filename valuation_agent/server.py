@@ -51,7 +51,14 @@ class Gateway:
         if action=='contract':
             rid=payload.get('record_id')
             if not isinstance(rid,str)or rid not in self.ledger:raise ValueError('Unknown record')
-            return {'record_id':rid,'lines':[safe_reference(valuation.reference(r,valuation.rejection(r,self.duplicates,self.shared)))for r in self.rows if r['record_id']==rid and (valuation.is_checked(r)or r.get('source_fields_reviewed'))]}
+            lines=[]
+            for row in self.rows:
+                if row['record_id']!=rid or not (valuation.is_checked(row)or row.get('source_fields_reviewed')):
+                    continue
+                ref=valuation.reference(row,valuation.rejection(row,self.duplicates,self.shared))
+                ref['source_url']=wb.original_document_url(row,self.ledger[rid])
+                lines.append(safe_reference(ref))
+            return {'record_id':rid,'lines':lines}
         document=payload.get('document');rows=document.get('rows')if isinstance(document,dict)else None
         if not isinstance(rows,list)or not 1<=len(rows)<=50:raise ValueError('One to fifty rows required')
         from .source_identity import exclude_current_sources

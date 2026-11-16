@@ -44,6 +44,19 @@ class GatewaySecurity(unittest.TestCase):
   with self.assertRaises(ValueError):self.app.dispatch('compare',{'document':{'rows':[{}]*51}})
  def test_health_does_not_expose_data_or_accounts(self):
   code,body=self.request(path='/health',method='GET',headers=[]);self.assertEqual(code,200);self.assertEqual(set(body),{'status','version'})
+ def test_contract_resolves_original_for_each_attachment(self):
+  from valuation_agent.engine import modules
+  self.app.engine['workbench'].original_document_url=modules()['workbench'].original_document_url
+  self.app.engine['valuation']=types.SimpleNamespace(reference=lambda r,e:dict(r),rejection=lambda *a:None,is_checked=lambda r:True)
+  a,b='A'*20,'B'*20
+  self.app.ledger={'r':{'attachments':[{'token':a,'type':'file'},{'token':b,'type':'docx'}]}}
+  self.app.rows=[{'record_id':'r','source_token':t,'source_attributes':{'private':'hidden'}} for t in (a,b,'unknown')]
+  code,body=self.request('/v1/contract',json.dumps({'record_id':'r'}).encode())
+  self.assertEqual(code,200)
+  self.assertTrue(body['lines'][0]['source_url'].endswith('/file/'+a))
+  self.assertTrue(body['lines'][1]['source_url'].endswith('/docx/'+b))
+  self.assertIsNone(body['lines'][2]['source_url'])
+  self.assertNotIn('source_attributes',str(body))
  def test_client_rejects_http_and_insecure_config(self):
   p=Path(self.temp.name)/'client.json';p.write_text(json.dumps({'endpoint':'http://example.com','token':self.token}));p.chmod(0o600)
   with self.assertRaisesRegex(ValueError,'HTTPS'):remote_call('search',{},p)
