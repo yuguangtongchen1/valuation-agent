@@ -4,7 +4,8 @@ import os
 from pathlib import Path
 from .activation import parse_access_code
 
-RELEASE = "67d276ca5a1ff0ce23b9dc2db57cd14c0ebc66e3"
+# Frozen source revision validated by the complete 82-test delivery suite.
+RELEASE = "f96a347c7a1dba6befff212b080ba2b8d8336d6b"
 
 def write_command(code, output, windows=False):
     parse_access_code(code)
