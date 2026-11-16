@@ -70,7 +70,7 @@ def _parameter_values(value, default_dimension_unit=''):
     # Explicit object labels must survive normalization: a glyph height is not
     # the height of the wall carrying it. Remove these spans before generic axes.
     scoped = re.compile(
-        rf'(?P<label>中文大标题字高|英文副标题字高|中文正文字高|中文小文字字高|中文字高|英文大写字高|英文字高|字高|墙面高度|墙面长度|墙面宽度)'
+        rf'(?P<label>中文大标题字高|英文大标题字高|英文副标题字高|中文正文字高|中文小文字字高|中文字高|英文大写字高|英文字高|字高|墙面高度|墙面长度|墙面宽度)'
         rf'\s*[:：=]?\s*(?P<number>{NUMBER})\s*(?P<unit>{LENGTH_UNIT})?'
         r'(?![a-z\d.])'
     )

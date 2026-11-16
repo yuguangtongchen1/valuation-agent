@@ -46,3 +46,9 @@ class ObjectScopedParametersTests(unittest.TestCase):
     def test_unscoped_wall_and_missing_units_survive_object_sections(self):
         result = parameters('墙面范围：6000×3000mm；【对象：入口墙】中文字高32；【对象：时间墙】中文字高35mm')
         self.assertEqual(set(result), {'墙面范围', '时间墙 · 中文字高'})
+
+    def test_english_title_not_collapsed_into_generic_height(self):
+        result = parameters('中文大标题字高11cm；英文大标题字高8.5cm；中文小文字字高5.1cm')
+        self.assertEqual(set(result), {'中文大标题字高', '英文大标题字高', '中文小文字字高'})
+        self.assertEqual(list(result['英文大标题字高']), [85])
+        self.assertEqual(list(result['中文小文字字高']), [51])
