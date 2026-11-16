@@ -31,7 +31,7 @@ def make_handler(config,session_key,input_path=None,worksheet=None):
         if not config.is_file():raise ValueError('请先激活工作台。')
         return {'revision':handoff_state['revision'],'document':handoff_state['document'],'filename':source.name}
     def query_row(query):
-        return {'item_name':str(query.get('name')or query.get('item_name')or ''),**{k:v for k,v in query.items()if k in ('quantity','unit','currency','brand','model','spec','configuration','dimension_unit','description','source_url','source_token','source_sha256','quotation_family_id','economic_purchase_group','comparison_components')}}
+        return {'item_name':str(query.get('name')or query.get('item_name')or ''),**{k:v for k,v in query.items()if k in ('spec_status','quantity','unit','currency','brand','model','spec','configuration','dimension_unit','description','source_url','source_token','source_sha256','quotation_family_id','economic_purchase_group','comparison_components')}}
     def enrich(found):
         for row in found.get('references',[]):
             row.setdefault('sheet',str(row.get('signed_date')or '')[:4])

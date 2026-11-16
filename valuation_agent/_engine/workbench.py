@@ -698,6 +698,8 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
             label = '整包金额参考' if row.get('kind') == 'whole_scope_quote' else '明细金额参考'
             reason += '。历史仅提供范围金额，不作为当前分项单价或整项高低判断依据'
             differences.append('整包或明细总额与分项单价不可直接比较')
+        if query.get('spec_status') == 'source_conflict':
+            differences.append('当前报价文字与图纸规格有差异')
         zero_quantity_quote = number(row.get('quantity')) == 0
         if zero_quantity_quote:
             label += ' · 零数量报价'

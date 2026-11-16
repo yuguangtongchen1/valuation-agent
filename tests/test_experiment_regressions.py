@@ -178,3 +178,28 @@ class ExperimentRegressions(unittest.TestCase):
         refs = w.priced_references(Path('.'), [row], ledger, {}, {},
                    {'name':'环形座椅','currency':'CNY'}, component=('环形座椅',(None,None)))
         self.assertEqual(refs, [])
+
+    def test_gateway_source_conflict_blocks_otherwise_comparable_price(self):
+        import tempfile
+        from unittest.mock import patch
+        from valuation_agent.server import Gateway
+        row = dict(kind='bom_line', source_fields_reviewed=True,
+                   record_status='contract_reconciled',
+                   record_id='independent', line_id='line', source_token='source',
+                   item_name='施工图绘制', quantity=1, unit='项', unit_price=1000,
+                   subtotal=1000, currency='CNY', project_key='project', source_locator='row1')
+        ledger={'independent':{'sheet':'2025','row':1,'contract_name':'设计合同','contract_link':'设计.pdf'}}
+        with tempfile.TemporaryDirectory() as directory:
+            app=Gateway(directory,Path(directory)/'unused',loader=lambda **kw:(modules(),Path(directory),[row],ledger,{}, {},None,{}))
+            try:
+                query={'item_name':'施工图绘制','unit':'项','quantity':1,'currency':'CNY'}
+                with patch.object(modules()['workbench'], 'rejection', return_value=None):
+                    baseline=app.dispatch('compare',{'document':{'rows':[query]}})['rows'][0]['references']
+                query['spec_status']='source_conflict'
+                with patch.object(modules()['workbench'], 'rejection', return_value=None):
+                    changed=app.dispatch('compare',{'document':{'rows':[query]}})['rows'][0]['references']
+            finally:app.executor.shutdown(wait=True)
+        self.assertTrue(baseline[0]['price_comparison_eligible'])
+        self.assertFalse(changed[0]['price_comparison_eligible'])
+        self.assertIn('当前报价文字与图纸规格有差异',changed[0]['differences'])
+        self.assertEqual(changed[0]['unit_price'],baseline[0]['unit_price'])

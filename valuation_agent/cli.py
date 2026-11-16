@@ -16,9 +16,12 @@ def remote_compare(document,config):
     from .remote import remote_call
     if not document['rows'] or len(document['rows'])>1000:raise ValueError('远程比价每份支持1至1000条，请拆分。')
     result=None
-    fields=('comparison_components','item_name','spec','model','brand','description','configuration','quantity','unit','currency','dimension_unit','row_id','source_locator','unit_price','subtotal','source_url','source_token','source_sha256','quotation_family_id','economic_purchase_group','record_id')
+    fields=('spec_status','comparison_components','item_name','spec','model','brand','description','configuration','quantity','unit','currency','dimension_unit','row_id','source_locator','unit_price','subtotal','source_url','source_token','source_sha256','quotation_family_id','economic_purchase_group','record_id')
     for start in range(0,len(document['rows']),20):
         rows=[{k:r[k] for k in fields if k in r} for r in document['rows'][start:start+20]]
+        for original, row in zip(document['rows'][start:start+20], rows):
+            from .completeness import assess
+            row['spec_status'] = assess(original)['status']
         identity_fields=('source_url','source_token','source_sha256','quotation_family_id','economic_purchase_group','record_id')
         identities=[{k:r[k] for k in identity_fields if r.get(k)} for r in [document]+document['rows']]
         identities=list({json.dumps(x,sort_keys=True):x for x in identities if x}.values())

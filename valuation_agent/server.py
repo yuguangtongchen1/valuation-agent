@@ -83,7 +83,7 @@ class Gateway:
         output=[]
         for row in rows:
             if not isinstance(row,dict)or not isinstance(row.get('item_name'),str)or not 1<=len(row['item_name'].strip())<=120:raise ValueError('Invalid item name')
-            allowed=('item_name','spec','model','brand','description','configuration','quantity','unit','currency','dimension_unit','row_id','source_locator','unit_price','subtotal')
+            allowed=('spec_status','item_name','spec','model','brand','description','configuration','quantity','unit','currency','dimension_unit','row_id','source_locator','unit_price','subtotal')
             clean={k:row[k]for k in allowed if k in row}
             if any(not isinstance(v,(str,int,float,type(None)))or isinstance(v,bool)or len(str(v))>6000 for v in clean.values()):raise ValueError('Invalid field')
             components=row.get('comparison_components',[])

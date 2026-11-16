@@ -207,3 +207,7 @@ valuation-agent contract <检索返回的record_id> --remote /path/to/remote.jso
 以后沿用 `valuation-agent launch` 或原启动脚本即可：每次启动检查官方 `docs/latest.json`，在独立目录安装并验证新版后切换；运行中不自动重启。断网或安装失败继续使用已安装版。也可运行 `valuation-agent update` 提前准备升级。发布时必须更新此稳定版清单，且先验证对应 GitHub 标签可安装。
 
 0.2.19 及更早版没有更新器，须在原独立环境一次性升级到 0.2.20；不重新激活、不删除环境、不清浏览器数据。迁移首次启动使用原端口，例如 `launch --port 59067`，保留原 `--remote`、`--input` 和 `--worksheet`。后续记住端口；端口被占用时不杀其他进程、不悄悄换端口。访问码沿用原配置文件，续期权限不因升级延长。报价原文件和库不移动；浏览器报价仍保存在原浏览器、原地址的 IndexedDB，换浏览器/端口不能保证看到旧记录。升级前可导出报价备份。
+
+## 重建原版网页
+
+维护者在 `ui` 中运行 `npm ci`、`npm run build`，再在仓库根目录运行 `python3 scripts/package-ui.py`。构建只使用公开示例，不复制真实报价或访问配置。普通使用者无需 Node.js；CLI 包内提供构建后的完整工作台。
