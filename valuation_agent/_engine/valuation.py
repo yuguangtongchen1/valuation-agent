@@ -106,13 +106,22 @@ def comparable_key(row):
 
 
 def count_estimate_groups(rows):
-    groups = defaultdict(lambda: defaultdict(set))
+    """Require distinct projects AND independent originals for multi-project evidence."""
+    groups = defaultdict(lambda: defaultdict(lambda: {'prices': set(), 'sources': set()}))
     for row, reason in rows:
-        if reason is None:
+        source = row.get('source_token')
+        if reason is None and source and positive(row.get('unit_price')):
             key = comparable_key({**row, 'scope': scope(row)})
-            groups[key][row['project_key']].add(number(row['unit_price']))
-    return sum(sum(len(prices) == 1 for prices in projects.values()) >= 2
-               for projects in groups.values())
+            evidence = groups[key][row['project_key']]
+            evidence['prices'].add(number(row['unit_price']))
+            evidence['sources'].add(source)
+    total = 0
+    for projects in groups.values():
+        sources = [entry['sources'] for entry in projects.values() if len(entry['prices']) == 1]
+        # A shared attachment copied across ledger records is still one observation.
+        total += any(len(left | right) >= 2
+                     for index, left in enumerate(sources) for right in sources[index + 1:])
+    return total
 
 
 def price_role_block(row):
