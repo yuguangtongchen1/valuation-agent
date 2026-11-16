@@ -12,7 +12,7 @@ from .engine import modules
 
 
 ALIASES = {
-    "item_name": ("item_name", "name", "名称", "物料", "物料名称", "材料名称", "产品名称", "服务名称", "项目／展项", "项目/展项", "工程名称", "报目名称"),
+    "item_name": ("item_name", "name", "名称", "物料", "物料名称", "材料名称", "产品名称", "服务名称", "费用说明", "项目／展项", "项目/展项", "工程名称", "报目名称"),
     "model": ("model", "型号", "产品型号"),
     "spec": ("spec", "specification", "规格", "规格型号", "规格/型号", "规格 / 型号", "规格尺寸", "规格/尺寸", "尺寸mm", "尺寸数量"),
     "description": ("description", "工艺说明", "工艺描述", "描述", "工作内容", "服务内容", "制作工艺", "项目特征"),
@@ -20,7 +20,7 @@ ALIASES = {
     "quantity": ("quantity", "qty", "数量"),
     "unit": ("unit", "单位", "计价单位"),
     "unit_price": ("unit_price", "单价", "原始单价", "综合单价"),
-    "subtotal": ("subtotal", "amount", "金额", "小计", "总价", "原表金额"),
+    "subtotal": ("subtotal", "amount", "金额", "小计", "总价", "原表金额", "付款金额"),
     "currency": ("currency", "币种"),
     "supplier": ("supplier", "供应商", "乙方公司"),
     "project": ("project", "project_name", "项目", "项目名称"),
@@ -224,6 +224,9 @@ def read_input(path, worksheet=None):
     normalized = []
     previous_source = None
     for index, original in enumerate(rows, 1):
+        if str(original.get('费用说明') or '').strip() in {'合计', '总计', '小计', '税额', '优惠价'}:
+            metadata.setdefault('non_item_rows', []).append({'kind':'summary','source_original_fields':original})
+            continue
         row = dict(original)
         keys = {str(k).strip().casefold(): k for k in original}
         for field, aliases in ALIASES.items():

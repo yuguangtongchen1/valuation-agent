@@ -28,6 +28,20 @@ class HeaderTests(unittest.TestCase):
             self.assertEqual(rows[3]['item_name'],'展墙')
             self.assertIsNone(rows[3]['source_original_fields']['项目／展项'])
             self.assertEqual(len(result['non_item_rows']),2)
+    def test_service_fee_table_retains_duration_without_guessing_rate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)/'service.csv'
+            p.write_text('费用说明,天数,付款金额（人民币元）\n现场保驾,6,23520\n总计,6,23520\n')
+            result=read_input(p)
+            self.assertEqual(len(result['rows']),1)
+            row=result['rows'][0]
+            self.assertEqual(row['item_name'],'现场保驾')
+            self.assertEqual(float(row['subtotal']),23520)
+            self.assertIsNone(row['quantity'])
+            self.assertIsNone(row['unit_price'])
+            self.assertEqual(row['source_original_fields']['天数'],'6')
+            self.assertEqual(result['non_item_rows'][0]['kind'],'summary')
+
     def test_no_guess(self):
         with tempfile.TemporaryDirectory() as tmp:
             p=Path(tmp)/'x.csv'; p.write_text('项目名称,金额\n某项目,100\n')
