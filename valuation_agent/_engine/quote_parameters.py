@@ -56,6 +56,33 @@ def _parameter_values(value, default_dimension_unit=''):
     value = re.sub(suffix_chain, lambda m: re.sub(rf'({NUMBER})\s*([lwh])', r'\2\1', m[0]), value)
     value = re.sub(r'(?<=\d)(?=[lwh]\s*[:=]?\s*\d)', '×', value)
     output = {}
+    # Explicit object labels must survive normalization: a glyph height is not
+    # the height of the wall carrying it. Remove these spans before generic axes.
+    scoped = re.compile(
+        rf'(?P<label>中文大标题字高|英文副标题字高|中文正文字高|中文字高|英文大写字高|英文字高|字高|墙面高度|墙面长度|墙面宽度)'
+        rf'\s*[:：=]?\s*(?P<number>{NUMBER})\s*(?P<unit>{LENGTH_UNIT})?'
+        r'(?![a-z\d.])'
+    )
+    def capture_scoped(match):
+        unit = match['unit'] or default_dimension_unit
+        if unit in LENGTH_FACTORS:
+            output.setdefault(match['label'], {})[
+                Decimal(match['number']) * LENGTH_FACTORS[unit]
+            ] = f'{match["number"]} {unit}'
+        return ' '
+    value = scoped.sub(capture_scoped, value)
+    wall_size = re.compile(
+        rf'墙面范围\s*[:：]\s*(?P<size>{NUMBER}\s*[x×*]\s*{NUMBER})'
+        rf'\s*(?P<unit>{LENGTH_UNIT})?(?![a-z\d.])'
+    )
+    def capture_wall(match):
+        unit = match['unit'] or default_dimension_unit
+        if unit in LENGTH_FACTORS:
+            dimensions = tuple(Decimal(n) * LENGTH_FACTORS[unit]
+                               for n in re.findall(NUMBER, match['size']))
+            output.setdefault('墙面范围', {})[dimensions] = f'{match["size"]} {unit}'
+        return ' '
+    value = wall_size.sub(capture_wall, value)
     # An explicit unit at the end of an axis chain applies to the other axes in that chain.
     for phrase in re.split(r'[，,；;。\n]', value):
         for match in THICKNESS.finditer(phrase):
