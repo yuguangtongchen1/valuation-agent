@@ -60,3 +60,12 @@ class ObjectScopedParametersTests(unittest.TestCase):
         compared = {r['label']: r for r in parameter_comparison(current, history)}
         self.assertFalse(compared['英文大标题小写字高']['different'])
         self.assertTrue(compared['英文正文字高']['different'])
+
+class EtchingDepthTests(unittest.TestCase):
+    def test_depth_is_distinct_from_plate_thickness(self):
+        current = parameters('金属板厚度0.5mm；文字蚀刻深度0.15mm')
+        historical = parameters('金属板厚度0.05cm；文字蚀刻深度0.02cm')
+        self.assertEqual(set(current), {'厚度', '蚀刻深度'})
+        compared = {row['label']: row for row in parameter_comparison(current, historical)}
+        self.assertFalse(compared['厚度']['different'])
+        self.assertTrue(compared['蚀刻深度']['different'])
