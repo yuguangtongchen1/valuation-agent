@@ -214,7 +214,9 @@ def reference_pool(rows, allow_pending=False):
         # Explicit duplicate evidence remains in contract detail, not a new quote sample.
         if attrs.get('duplicate_quote_reference_only'):
             continue
-        scoped_out = (row.get('scope_association_pending') or row.get('comparison_eligible') is False)
+        scoped_out = (row.get('scope_association_pending')
+                      or row.get('comparison_eligible') is False
+                      or attrs.get('comparison_eligible') is False)
         if scoped_out and not view_only_variant(row):
             continue
         if ((positive(row.get('unit_price')) and row.get('unit'))

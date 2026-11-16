@@ -81,6 +81,18 @@ class GatewaySecurity(unittest.TestCase):
   self.assertTrue(public['source_fields_reviewed'])
   self.assertTrue(public['exclude_from_procurement_price_comparison'])
   self.assertEqual(engine['workbench'].reference_pool([row]),[])
+ def test_nested_source_exclusion_blocks_audited_zero_quantity(self):
+  from valuation_agent.engine import modules
+  wb=modules()['workbench']
+  row={'kind':'bom_line','item_name':'门头收银台亚克力灯管',
+       'source_fields_reviewed':True,'unit':'m','unit_price':'350',
+       'quantity':'0','subtotal':'0',
+       'source_attributes':{'comparison_eligible':False}}
+  self.assertEqual(wb.reference_pool([row]),[])
+  row['quantity']='11.5';row['subtotal']='4025'
+  self.assertEqual(wb.reference_pool([row]),[])
+  row['source_attributes']['comparison_eligible']=True
+  self.assertEqual(wb.reference_pool([row]),[row])
  def test_client_rejects_http_and_insecure_config(self):
   p=Path(self.temp.name)/'client.json';p.write_text(json.dumps({'endpoint':'http://example.com','token':self.token}));p.chmod(0o600)
   with self.assertRaisesRegex(ValueError,'HTTPS'):remote_call('search',{},p)
