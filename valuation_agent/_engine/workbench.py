@@ -713,7 +713,7 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
                        'reference_billing_multiplier_label': multiplier_label,
                        'reference_total_cny_yuan': ref.get('subtotal_cny_yuan'),
                        'independent_sample_key': row.get('economic_purchase_group') or attrs.get('economic_purchase_group') or row.get('purchase_evidence_group') or attrs.get('purchase_evidence_group') or attrs.get('observation_family') or attrs.get('shared_quote_family') or row.get('project_key'),
-                       'price_comparison_eligible': not included_component and not package_total and not view_only_variant(row) and exclusion is None and not [d for d in differences if d != '币种不同'] and not component,
+                       'price_comparison_eligible': is_checked(row) and not included_component and not package_total and not view_only_variant(row) and exclusion is None and not [d for d in differences if d != '币种不同'] and not component,
                        'match_reason': reason, 'parameters': compared,
                        'comparison_role': 'component' if included_component else 'package' if package_total else 'component' if component else 'package' if '整包旁证' in label else 'process' if '工艺' in label else 'partial' if '部分' in label or '交易或作业' in label else 'candidate',
                        'classification': classification,

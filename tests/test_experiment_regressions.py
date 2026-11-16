@@ -68,3 +68,20 @@ class ExperimentRegressions(unittest.TestCase):
             self.assertNotIn('屏幕形态', parameters(text))
         self.assertIn('曲面/弧形屏', parameters('弧形LED显示屏')['屏幕形态'])
         self.assertIn('超宽屏', parameters('超宽拼接屏')['屏幕形态'])
+
+    def test_pending_price_scope_is_visible_but_never_directly_comparable(self):
+        from unittest.mock import patch
+        w = modules()['workbench']
+        row = {'kind': 'bom_line', 'record_status': 'line_fields_verified_price_scope_pending',
+               'source_fields_reviewed': True, 'record_id': 'record', 'line_id': 'line',
+               'source_token': 'source', 'source_locator': 'row 1',
+               'item_name': '施工图绘制', 'unit': '项', 'quantity': 1,
+               'unit_price': 1000, 'subtotal': 1000, 'currency': 'CNY'}
+        ledger = {'record': {'contract_name': '设计合同', 'sheet': '2025', 'row': 1,
+                             'contract_link': '设计合同.docx'}}
+        query = {'name': '施工图绘制', 'unit': '项', 'currency': 'CNY'}
+        with patch.object(w, 'rejection', return_value=None), patch.object(w, 'reference', side_effect=lambda r, e: dict(r)):
+            refs = w.priced_references(Path('.'), [row], ledger, {}, {}, query)
+        self.assertEqual(len(refs), 1)
+        self.assertFalse(refs[0]['price_comparison_eligible'])
+        self.assertEqual(refs[0]['source_review_kind'], 'line_fields_checked')
