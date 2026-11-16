@@ -37,3 +37,10 @@ class ExperimentRegressions(unittest.TestCase):
         # A lookalike host must not establish a trusted token identity.
         kept=exclude_current_sources(history,{'source_url':'https://feishu.cn.attacker.example/file/Abc123FileToken'})
         self.assertEqual(len(kept),3)
+
+    def test_geometry_is_not_automatically_a_screen(self):
+        from valuation_agent._engine.quote_parameters import parameters
+        for text in ('弧形展墙，预留LED灯带', '超宽玻璃橱窗', '多楼层钢结构', '弧形展墙；另配显示屏'):
+            self.assertNotIn('屏幕形态', parameters(text))
+        self.assertIn('曲面/弧形屏', parameters('弧形LED显示屏')['屏幕形态'])
+        self.assertIn('超宽屏', parameters('超宽拼接屏')['屏幕形态'])

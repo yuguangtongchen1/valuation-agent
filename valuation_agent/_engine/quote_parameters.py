@@ -127,8 +127,8 @@ def _parameter_values(value, default_dimension_unit=''):
     for match in re.finditer(rf'({NUMBER})\s*gb\s*[+＋/]\s*({NUMBER})\s*gb', value):
         output.setdefault('内存', {})[Decimal(match[1])] = f'{match[1]} GB'
         output.setdefault('存储', {})[Decimal(match[2])] = f'{match[2]} GB'
-    forms = {'曲面/弧形屏': r'曲面|弧形|曲屏', '球幕/球形屏': r'球幕|球形屏|球屏',
-             '超宽屏': r'超宽', '裸眼3D': r'裸眼\s*3d|裸3', '多楼层': r'多楼层|[2-6]f'}
+    forms = {'曲面/弧形屏': r'(?:曲面|弧形)(?:led|显示|拼接|投影|柔性|电子|\s){0,6}屏|曲屏', '球幕/球形屏': r'球幕|球形屏|球屏',
+             '超宽屏': r'超宽(?:led|显示|拼接|投影|\s){0,6}屏', '裸眼3D': r'裸眼\s*3d|裸3', '多楼层': r'(?:多楼层|[2-6]f)(?:led|显示|拼接|\s){0,6}屏'}
     for label, pattern in forms.items():
         if re.search(pattern, value):
             output.setdefault('屏幕形态', {})[label] = label
