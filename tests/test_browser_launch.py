@@ -24,7 +24,7 @@ class BrowserDeliveryTests(unittest.TestCase):
    thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start();url=f'http://127.0.0.1:{server.server_port}'
    try:
     page=urllib.request.urlopen(url).read().decode();self.assertIn('<div id="root"></div>',page);self.assertIn('X-Workbench-Session',page)
-    payload={'name':'地台','spec':'钢木结构','unit':'平米','quantity':'5','exclude':'self-record'}
+    payload={'name':'地台','brand':'测试品牌','spec':'钢木结构','unit':'平米','quantity':'5','exclude':'self-record'}
     mocked={'rows':[{'quote':{'item_name':'地台'},'references':[{'record_id':'self-record'},{'record_id':'other','signed_date':'2025/1/1','unit_price':'30'}]}]}
     with patch('valuation_agent.browser_app.remote_compare',return_value=mocked)as compare:
      for _ in range(2):
@@ -32,6 +32,7 @@ class BrowserDeliveryTests(unittest.TestCase):
       out=json.load(urllib.request.urlopen(req));self.assertEqual(len(out['references']),1);self.assertEqual(out['references'][0]['sheet'],'2025')
      self.assertEqual(compare.call_count,1);self.assertEqual(compare.call_args[0][0]['rows'][0]['item_name'],'地台')
      self.assertEqual(compare.call_args[0][0]['rows'][0]['spec'],'钢木结构')
+     self.assertEqual(compare.call_args[0][0]['rows'][0]['brand'],'测试品牌')
    finally:server.shutdown();server.server_close()
  def test_local_origin_session_and_ui_assets(self):
   with tempfile.TemporaryDirectory()as tmp:
