@@ -20,3 +20,11 @@
 ## 质量门槛
 
 建立逐行标注集合，包括正确同类、整包包含、仅子件相似、不相关、无证据。报告 Recall@K、前列准确率、同源泄漏、旧版重复、单位不兼容比例及 P50/P95 延迟。没有标注集不声称召回完整；没有 Windows 真机不声称 Windows 验收通过。回归保留环形灯/灯带、施工图/深化设计、运营/搭建、图文/图片尺寸等失败案例。
+
+## 离线验收工具
+
+运行 `python -m valuation_agent.retrieval_evaluation labelled-cases.json --k 5 --output evaluation.json`。
+输入是数组，每项包含 `query_id`、`relevant_ids`、`retrieved_ids`；可补 `judged_ids`、`forbidden_ids` 和实测 `elapsed_ms`。
+ID 应对应独立历史报价观察，不能用重复卡片充当样本。`judged_ids` 是已经人工核定的候选集合，包含相关和不相关记录。未审候选单列，不默认正确；没有正样本的查询不记满分召回；自源和旧版应放入 forbidden_ids，检查全结果泄漏。延迟仅统计提供的实测值。
+
+该工具提供统一比较词法、向量与混合检索的计分方式，尚不代表这些新检索路径已经上线。真实准确率须用独立标注和真实服务结果计算，不能用合成单元测试替代。
