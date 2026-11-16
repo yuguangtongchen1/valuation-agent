@@ -160,3 +160,21 @@ class ExperimentRegressions(unittest.TestCase):
         self.assertFalse(refs[0]['price_comparison_eligible'])
         self.assertEqual(result['retrieval_corpus']['same_source_rows'], 2)
         self.assertEqual(result['retrieval_corpus']['other_inactive_version_rows'], 1)
+
+    def test_seating_component_uses_same_taxonomy_as_whole_search(self):
+        from unittest.mock import patch
+        w = modules()['workbench']
+        row = dict(kind='bom_line', source_fields_reviewed=True, record_id='chair',
+                   line_id='chair', source_token='chair', source_locator='row 1',
+                   item_name='休闲座椅', spec='定制', quantity=1, unit='m',
+                   unit_price=1000, subtotal=1000, currency='CNY')
+        ledger = {'chair':{'sheet':'2025','row':1,'contract_name':'座椅采购','contract_link':'座椅.pdf'}}
+        refs = w.priced_references(Path('.'), [row], ledger, {}, {},
+                   {'name':'环形座椅','currency':'CNY'}, component=('环形座椅',(None,None)))
+        self.assertEqual([r['item_name'] for r in refs], ['休闲座椅'])
+        self.assertEqual(refs[0]['comparison_role'], 'component')
+        self.assertFalse(refs[0]['price_comparison_eligible'])
+        row['item_name'] = '座椅运输服务'
+        refs = w.priced_references(Path('.'), [row], ledger, {}, {},
+                   {'name':'环形座椅','currency':'CNY'}, component=('环形座椅',(None,None)))
+        self.assertEqual(refs, [])

@@ -572,10 +572,18 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
             name, _ = component
             past = norm(row['item_name'])
             core = COMPONENT_VARIANT.sub('', past)
+            # A service performed on an object is not that physical component.
+            service_terms = r'运输|搬运|拆除|维修|租赁|安装服务'
+            if re.search(service_terms, past) and not re.search(service_terms, norm(name)):
+                continue
             related = any(norm(name) in aliases and core in aliases for aliases in COMPONENT_ALIASES)
             current_concept, old_concept = concept(norm(name)), concept(past, str(row.get('description') or '') + ' ' + str(row.get('spec') or ''))
-            semantic_related = bool(current_concept and old_concept and current_concept[0] == old_concept[0]
-                                    and not re.search(r'[+＋]|整包|组合|套装|及|与', past))
+            component_path = line_classification(query, 'name', ('name', 'spec', 'description'))
+            candidate_path = line_classification(row, 'item_name', ('item_name', 'spec', 'description'))
+            semantic_related = bool(
+                ((current_concept and old_concept and current_concept[0] == old_concept[0])
+                 or comparable_class(component_path, candidate_path, norm(name), past))
+                and not re.search(r'[+＋]|整包|组合|套装|及|与', past))
             # Broaden only an explicitly requested light source, never the whole fixture.
             light_source_analogy = (norm(name) in ('led灯', 'led光源')
                 and bool(re.search(r'灯带|灯条|线性灯', past))
