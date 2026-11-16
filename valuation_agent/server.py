@@ -52,9 +52,18 @@ class Gateway:
             rid=payload.get('record_id')
             if not isinstance(rid,str)or rid not in self.ledger:raise ValueError('Unknown record')
             lines=[]
+            tokens = {a.get('token') for a in self.ledger[rid].get('attachments', []) if a.get('token')}
+            own_tokens = {r.get('source_token') for r in self.rows if r.get('record_id') == rid}
+            seen = set()
             for row in self.rows:
-                if row['record_id']!=rid or not (valuation.is_checked(row)or row.get('source_fields_reviewed')):
+                token = row.get('source_token')
+                linked = token in tokens and token not in own_tokens
+                if (row['record_id'] != rid and not linked) or not (valuation.is_checked(row)or row.get('source_fields_reviewed')):
                     continue
+                identity = (row.get('line_id'), token)
+                if identity in seen:
+                    continue
+                seen.add(identity)
                 ref=valuation.reference(row,valuation.rejection(row,self.duplicates,self.shared))
                 ref['source_url']=wb.original_document_url(row,self.ledger[rid])
                 lines.append(safe_reference(ref))

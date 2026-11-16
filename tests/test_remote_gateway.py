@@ -57,6 +57,19 @@ class GatewaySecurity(unittest.TestCase):
   self.assertTrue(body['lines'][1]['source_url'].endswith('/docx/'+b))
   self.assertIsNone(body['lines'][2]['source_url'])
   self.assertNotIn('source_attributes',str(body))
+ def test_contract_can_read_exact_shared_attachment_without_copying_rows(self):
+  from valuation_agent.engine import modules
+  self.app.engine['workbench'].original_document_url=modules()['workbench'].original_document_url
+  self.app.engine['valuation']=types.SimpleNamespace(reference=lambda r,e:dict(r),rejection=lambda *a:None,is_checked=lambda r:True)
+  token='A'*20
+  self.app.ledger={'requested':{'attachments':[{'token':token,'type':'file'}]}}
+  self.app.rows=[{'record_id':'original','line_id':'line1','source_token':token,'item_name':'人物骨骼绑定'},
+                 {'record_id':'other','line_id':'line2','source_token':'B'*20,'item_name':'无关服务'}]
+  result=self.app.dispatch('contract',{'record_id':'requested'})
+  self.assertEqual(len(result['lines']),1)
+  self.assertEqual(result['lines'][0]['record_id'],'original')
+  self.assertEqual(result['lines'][0]['item_name'],'人物骨骼绑定')
+  self.assertEqual(len(self.app.rows),2)
  def test_client_rejects_http_and_insecure_config(self):
   p=Path(self.temp.name)/'client.json';p.write_text(json.dumps({'endpoint':'http://example.com','token':self.token}));p.chmod(0o600)
   with self.assertRaisesRegex(ValueError,'HTTPS'):remote_call('search',{},p)
