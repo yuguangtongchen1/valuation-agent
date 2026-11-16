@@ -4,6 +4,10 @@ import re
 def assess(row):
     spec=str(row.get('spec') or row.get('dimensions') or '').strip()
     images=row.get('image_evidence') or []
+    review = row.get('spec_review') or {}
+    if review.get('status') == 'source_conflict':
+        return {'status': 'source_conflict', 'label': '规格来源有差异',
+                'reason': review.get('evidence') or review.get('note') or spec or '报价文字与图纸参数不一致，保留各自来源值'}
     if re.search(r'依据模型深化|待设计|待深化',spec):
         return {'status':'design_pending','label':'待设计确定','reason':spec}
     if spec and spec not in ('—','-'):
