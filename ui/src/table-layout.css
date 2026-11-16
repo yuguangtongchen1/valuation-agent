@@ -1,0 +1,197 @@
+/* A readable connected table: the reference belongs to the selected row. */
+.valuation-sheet,
+.valuation-detail,
+.valuation-entry {
+  --table-text: clamp(.96rem, .76rem + .28vw, 1.08rem);
+  --table-number: clamp(.94rem, .71rem + .29vw, 1.07rem);
+  --table-muted: #607066;
+}
+.valuation-sheet .simple-header { padding: 20px 24px; gap: 20px; }
+.valuation-sheet .quote-title { flex: 1; gap: 16px; }
+.valuation-sheet .quote-title > div { min-width: 0; }
+.valuation-sheet .quote-title h1 { font-size: clamp(1.3rem, 1.05rem + .6vw, 1.7rem); line-height: 1.4; text-wrap: pretty; }
+.valuation-sheet .simple-actions > button { font-size: 1rem; min-height: 42px; }
+.valuation-sheet .sheet-area { padding: 20px 24px 24px; }
+.valuation-sheet .quote-sheet-scroll:has(.row-connected) { max-height: none; height: auto; overflow: visible; }
+.valuation-sheet .row-connected { width: 100%; min-width: 0; table-layout: fixed; }
+.valuation-sheet .row-connected > thead > tr > th:nth-child(1) { width: 10%; }
+.valuation-sheet .row-connected > thead > tr > th:nth-child(2) { width: 17%; }
+.valuation-sheet .row-connected > thead > tr > th:nth-child(3) { width: 9%; }
+.valuation-sheet .row-connected > thead > tr > th:nth-child(4) { width: 8%; }
+.valuation-sheet .row-connected > thead > tr > th:nth-child(5) { width: 5%; }
+.valuation-sheet .row-connected > thead > tr > th:nth-child(6) { width: 9%; }
+.valuation-sheet .row-connected > thead > tr > th:nth-child(7) { width: 11%; }
+.valuation-sheet .row-connected > thead > tr > th:nth-child(8) { width: 31%; }
+.valuation-sheet .row-connected > thead > tr > th { padding: 15px 9px; height: 52px; font-size: .94rem; white-space: nowrap; }
+.valuation-sheet .row-connected > tbody > tr > td { padding: 18px 9px; height: auto; font-size: var(--table-text); line-height: 1.65; }
+.valuation-sheet .row-connected > tbody > tr > td.num,
+.valuation-sheet .row-connected > tbody > tr > td.sheet-unit { font-size: var(--table-number); white-space: nowrap; overflow-wrap: normal; }
+.valuation-sheet .row-connected .sheet-name { font-size: inherit; line-height: 1.65; gap: 5px; }
+.valuation-sheet .row-connected .sheet-dimensions { font-size: .96rem; line-height: 1.7; }
+.valuation-sheet .row-connected .long-description { font-size: inherit; line-height: inherit; }
+.valuation-sheet .row-connected .long-description > summary > span { font-size: .94rem; margin-top: 5px; }
+.valuation-sheet .row-connected .region-row th { padding: 12px 9px; font-size: 1rem; }
+.valuation-sheet .row-connected > tbody > tr.chosen > td.attached-reference-cell { padding: 0 0 0 14px; vertical-align: top; }
+.valuation-sheet .attached-reference { max-height: 300px; overflow: auto; overscroll-behavior: contain; }
+.valuation-sheet .attached-reference > table { width: 100%; table-layout: fixed; }
+.valuation-sheet .attached-reference > table > colgroup > col:first-child { width: calc(100% - 122px); }
+.valuation-sheet .attached-reference .reference-price-column { width: 122px; }
+.valuation-sheet .attached-reference > table > thead > tr > th { width: auto; padding: 10px 12px; font-size: .94rem; font-weight: 600; }
+.valuation-sheet .attached-reference > table > tbody > tr > td { padding: 12px 10px; vertical-align: top; font-size: 1rem; line-height: 1.55; }
+.valuation-sheet .attached-reference > table > tbody > tr > td:first-child { width: auto; overflow-wrap: break-word; }
+.valuation-sheet .attached-reference > table > tbody > tr > td:last-child:not([colspan]) { width: 122px; padding-left: 2px; white-space: nowrap; }
+.valuation-sheet .attached-reference .reference-item { width: 100%; padding: 0; line-height: 1.55; }
+.valuation-sheet .attached-reference .reference-item strong { font-size: 1.04rem; font-weight: 600; }
+.valuation-sheet .attached-reference .reference-kind { margin-top: 5px; font-size: .94rem; line-height: 1.55; color: #3e6553; }
+.valuation-sheet .attached-reference .reference-reason { margin-top: 6px; font-size: .96rem; line-height: 1.65; color: #42534a; }
+.valuation-sheet .attached-reference .reference-differences { margin-top: 7px; padding: 4px 6px; border-radius: 3px; background: #fff4cf; color: #735019; font-size: .94rem; line-height: 1.65; }
+.valuation-sheet .attached-reference .reference-project,
+.valuation-sheet .attached-reference .reference-supplier { display: block; margin-top: 7px; font-size: .94rem; line-height: 1.55; color: var(--table-muted); overflow-wrap: break-word; }
+.valuation-sheet .attached-reference .reference-supplier { margin-top: 2px; }
+.valuation-sheet .attached-reference .price-inline { display: inline-flex; gap: 4px; align-items: baseline; font-size: clamp(.96rem, .79rem + .25vw, 1.12rem); line-height: 1.55; white-space: nowrap; }
+.valuation-sheet .attached-reference .price-inline strong { font-size: inherit; }
+.valuation-sheet .attached-reference .price-inline small { display: inline; font-size: .88rem; white-space: nowrap; }
+.valuation-sheet .attached-reference .reference-rate-total { display: block; margin-top: 8px; color: #647368; font-size: .94rem; white-space: nowrap; }
+.valuation-sheet .unit-price-trigger { min-height: 36px; font-weight: 600; }
+.valuation-sheet .quote-sheet .sheet-name small { display: none; }
+.valuation-sheet .simple-notice { overflow-wrap: anywhere; }
+
+.valuation-detail { width: 100%; max-width: 1260px; padding: 30px clamp(16px, 3vw, 36px) 48px; }
+.valuation-detail h1 { font-size: clamp(1.7rem, 1.2rem + 1.5vw, 2.65rem); line-height: 1.35; text-wrap: pretty; overflow-wrap: break-word; }
+.valuation-detail .contract-subtitle { font-size: 1rem; }
+.valuation-detail h2 { font-size: 1.2rem; margin: 26px 0 12px; }
+.valuation-detail .valuation-meta > div { font-size: 1rem; line-height: 1.7; }
+.valuation-detail .evidence-scroll { width: 100%; overflow: visible; }
+.valuation-detail .evidence-table { table-layout: fixed; min-width: 0; width: 100%; }
+.valuation-detail .evidence-table th,
+.valuation-detail .evidence-table td { padding: 12px 10px; font-size: 1rem; line-height: 1.65; overflow-wrap: break-word; }
+.valuation-detail .evidence-table th:nth-child(1) { width: 19%; }
+.valuation-detail .evidence-table th:nth-child(2) { width: 41%; }
+.valuation-detail .evidence-table th:nth-child(3) { width: 8%; }
+.valuation-detail .evidence-table th:nth-child(4) { width: 7%; }
+.valuation-detail .evidence-table th:nth-child(5) { width: 12%; }
+.valuation-detail .evidence-table th:nth-child(6) { width: 13%; }
+.valuation-detail .evidence-table td.price-inline { white-space: nowrap; overflow-wrap: normal; font-size: var(--table-number); }
+.valuation-detail .spec-note,
+.valuation-detail .spec-differences { font-size: .94rem; line-height: 1.65; }
+.valuation-detail .parameter-comparison { max-width: 100%; }
+.valuation-detail .parameter-comparison table { table-layout: fixed; font-size: 1rem; }
+.valuation-detail .parameter-comparison th,
+.valuation-detail .parameter-comparison td { padding: 11px 10px; line-height: 1.65; }
+
+@media (max-width: 1050px) {
+  .valuation-sheet .simple-header { flex-wrap: wrap; }
+  .valuation-sheet .simple-actions { margin-left: auto; }
+  .valuation-sheet .sheet-area { padding: 12px 20px 24px; }
+  .valuation-sheet .row-connected,
+  .valuation-sheet .row-connected > tbody { display: block; }
+  .valuation-sheet .row-connected > thead { display: none; }
+  .valuation-sheet .row-connected > tbody > tr:not(.region-row) { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 14px; border: 1px solid #d5e0da; background: white; }
+  .valuation-sheet .row-connected > tbody > tr > td { display: block; min-width: 0; height: auto; padding: 11px 14px; border: 0; font-size: 1.04rem; }
+  .valuation-sheet .row-connected > tbody > tr > td[data-label]::before { display: block; margin-bottom: 5px; content: attr(data-label); color: #67766e; font-size: .94rem; font-weight: 400; line-height: 1.5; text-align: left; }
+  .valuation-sheet .row-connected > tbody > tr > td.sheet-material { grid-column: 1 / -1; border-bottom: 1px solid #e3ebe6; padding-top: 14px; padding-bottom: 10px; }
+  .valuation-sheet .row-connected > tbody > tr > td.sheet-material::before { display: none; }
+  .valuation-sheet .row-connected .sheet-name { font-size: 1.13rem; }
+  .valuation-sheet .row-connected > tbody > tr > td.sheet-description,
+  .valuation-sheet .row-connected > tbody > tr > td.sheet-dimensions { grid-column: span 2; }
+  .valuation-sheet .row-connected > tbody > tr > td.num,
+  .valuation-sheet .row-connected > tbody > tr > td.sheet-unit { font-size: 1.04rem; text-align: left; }
+  .valuation-sheet .row-connected > tbody > tr > td.empty-reference-lane { display: none; }
+  .valuation-sheet .row-connected > tbody > tr.chosen { border-color: #6b9f84; }
+  .valuation-sheet .row-connected > tbody > tr.chosen > td { border: 0; }
+  .valuation-sheet .row-connected > tbody > tr.chosen > td:first-child { box-shadow: inset 3px 0 #237252; }
+  .valuation-sheet .row-connected > tbody > tr.chosen > td.attached-reference-cell { grid-column: 1 / -1; padding: 0; border-top: 1px solid #6b9f84; }
+  .valuation-sheet .row-connected > tbody > tr.region-row { display: block; margin: 18px 0 8px; }
+  .valuation-sheet .row-connected > tbody > tr.region-row > th { display: block; border: 0; height: auto; padding: 10px 0; background: transparent; font-size: 1.04rem; }
+  .valuation-sheet .attached-reference { border-left: 0; max-height: 340px; }
+  .valuation-sheet .attached-reference > table > colgroup > col:first-child { width: calc(100% - 135px); }
+  .valuation-sheet .attached-reference .reference-price-column { width: 135px; }
+  .valuation-sheet .attached-reference > table > tbody > tr > td { padding: 13px 14px; }
+  .valuation-sheet .attached-reference > table > tbody > tr > td:last-child:not([colspan]) { width: 135px; padding-left: 4px; }
+  .valuation-sheet .attached-reference .price-inline { font-size: 1.12rem; }
+  .valuation-detail .evidence-table th:nth-child(1) { width: 18%; }
+  .valuation-detail .evidence-table th:nth-child(2) { width: 34%; }
+  .valuation-detail .evidence-table th:nth-child(3) { width: 10%; }
+  .valuation-detail .evidence-table th:nth-child(4) { width: 8%; }
+  .valuation-detail .evidence-table th:nth-child(5),
+  .valuation-detail .evidence-table th:nth-child(6) { width: 15%; }
+}
+
+@media (max-width: 700px) {
+  .valuation-steps { padding: 14px 16px; gap: 12px; }
+  .valuation-steps > strong { flex-basis: 100%; }
+  .valuation-steps li { font-size: .94rem; }
+  .valuation-sheet .simple-header { padding: 17px 16px; gap: 14px; }
+  .valuation-sheet .quote-title { align-items: flex-start; flex-wrap: wrap; gap: 12px; }
+  .valuation-sheet .quote-title > div { flex-basis: 100%; }
+  .valuation-sheet .quote-title h1 { font-size: 1.4rem; }
+  .valuation-sheet .simple-actions { width: 100%; margin: 0; }
+  .valuation-sheet .simple-actions > button { flex: 1; padding-inline: 10px; font-size: .97rem; white-space: nowrap; }
+  .valuation-sheet .sheet-area { padding: 4px 12px 20px; }
+  .valuation-sheet .row-connected > tbody > tr:not(.region-row) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .valuation-sheet .row-connected > tbody > tr > td.sheet-description,
+  .valuation-sheet .row-connected > tbody > tr > td.sheet-dimensions { grid-column: 1 / -1; }
+  .valuation-sheet .attached-reference > table > tbody > tr > td:last-child:not([colspan]) { width: 129px; }
+  .valuation-sheet .attached-reference .reference-price-column { width: 129px; }
+  .valuation-sheet .attached-reference > table > colgroup > col:first-child { width: calc(100% - 129px); }
+  .valuation-sheet .attached-reference .reference-item strong { font-size: 1.05rem; }
+  .valuation-sheet .attached-reference .reference-reason,
+  .valuation-sheet .attached-reference .reference-differences,
+  .valuation-sheet .attached-reference .reference-project { font-size: .96rem; }
+  .valuation-detail { padding: 20px 16px 32px; }
+  .valuation-detail .valuation-meta > div { display: block; margin: 11px 0; }
+  .valuation-detail .valuation-meta dt { color: #66756b; font-size: .94rem; margin-bottom: 2px; }
+  .valuation-detail .evidence-table,
+  .valuation-detail .evidence-table > tbody { display: block; }
+  .valuation-detail .evidence-table > thead { display: none; }
+  .valuation-detail .evidence-table > tbody > tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 12px; border: 1px solid #d5e0da; }
+  .valuation-detail .evidence-table td { display: block; min-width: 0; border: 0; padding: 10px 12px; }
+  .valuation-detail .evidence-table td:nth-child(1),
+  .valuation-detail .evidence-table td:nth-child(2) { grid-column: 1 / -1; }
+  .valuation-detail .evidence-table td:nth-child(1) { font-weight: 600; border-bottom: 1px solid #e3ebe6; }
+  .valuation-detail .evidence-table td[data-label]::before { display: block; margin-bottom: 3px; content: attr(data-label); color: #65756b; font-size: .94rem; font-weight: 400; white-space: nowrap; }
+  .valuation-detail .evidence-table td:nth-child(1)::before { display: none; }
+  .valuation-detail .evidence-table td.price-inline { font-size: 1rem; }
+  .valuation-detail .parameter-comparison th,
+  .valuation-detail .parameter-comparison td { padding: 9px 7px; font-size: .96rem; }
+  .entry-oa input,
+  .import-dialog input,
+  .import-dialog select { font-size: 16px; }
+  .import-dialog { width: calc(100% - 24px); max-width: 600px; margin: auto; padding: 20px; }
+}
+.reference-retry { display: block; width: fit-content; margin-top: 12px; padding: 8px 13px; border: 1px solid #b8cdc1; border-radius: 6px; background: #fff; color: #195f46; font: inherit; cursor: pointer; }
+.reference-retry:focus-visible { outline: 2px solid #237252; outline-offset: 3px; }
+
+/* Give descriptions the available rail width; prices keep an intrinsic column. */
+.valuation-sheet .attached-reference { container-type: inline-size; }
+.valuation-sheet .attached-reference .reference-item { text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.valuation-sheet .attached-reference .reference-item strong { font-size: clamp(14px, 3.9cqi, 16px); line-height: 1.5; }
+.valuation-sheet .attached-reference .reference-kind,
+.valuation-sheet .attached-reference .reference-reason,
+.valuation-sheet .attached-reference .reference-differences,
+.valuation-sheet .attached-reference .reference-project { font-size: clamp(13px, 3.5cqi, 14px); line-height: 1.6; }
+.valuation-sheet .attached-reference .reference-reason { margin-top: 4px; }
+.valuation-sheet .attached-reference .reference-project { margin-top: 5px; }
+.valuation-sheet .attached-reference .price-inline { font-size: clamp(14px, 3.8cqi, 16px); }
+@container (max-width: 340px) {
+ .attached-reference > table > colgroup > col:first-child { width: calc(100% - 106px) !important; }
+ .attached-reference .reference-price-column { width: 106px !important; }
+ .attached-reference > table > tbody > tr > td:last-child:not([colspan]) { width: 106px !important; }
+}
+
+.valuation-sheet .attached-reference .reference-differences {
+ display: block; max-width: 100%; box-sizing: border-box;
+ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal;
+}
+
+.specification-parts{display:grid;gap:10px}.specification-part{line-height:1.5}.specification-part + .specification-part{border-top:1px solid #dce5e0;padding-top:8px}.specification-part strong{font-weight:600;white-space:nowrap}.specification-part small{display:block;font-size:11px;color:#65756f;margin-top:4px}
+
+/* Readable evidence and fabrication details, without compressing the font. */
+.reference-points, .process-points { margin: 8px 0 0; padding-left: 1.5em; text-align: left; }
+.reference-points li, .process-points li { margin: 0 0 8px; padding-left: 2px; line-height: 1.65; overflow-wrap: anywhere; }
+.reference-item .reference-points { font-size: 14px; font-weight: 400; color: #344b42; }
+.sheet-description .process-points { margin-top: 0; }
+.process-points li:only-child { list-style: none; }
+.process-points:has(li:only-child) { padding-left: 0; }
+.attached-reference .reference-project { font-size: 13px; line-height: 1.5; }
+.sheet-description details img { display:block; margin:10px 0; border-radius:4px; }

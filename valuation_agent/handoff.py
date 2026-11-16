@@ -4,8 +4,8 @@ import os
 from pathlib import Path
 from .activation import parse_access_code
 
-# Frozen source revision validated by the complete 82-test delivery suite.
-RELEASE = "f96a347c7a1dba6befff212b080ba2b8d8336d6b"
+# Versioned release shared by public and recipient-specific installers.
+RELEASE = "v0.2.18"
 
 def write_command(code, output, windows=False):
     parse_access_code(code)

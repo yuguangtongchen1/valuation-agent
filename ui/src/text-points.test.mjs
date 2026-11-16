@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const source=readFileSync(new URL('./text-points.js',import.meta.url),'utf8');
+const {splitPoints}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+assert.deepEqual(splitPoints('材质不同（当前：金属+铜材；历史：钢架）；单位不同'),['材质不同（当前：金属+铜材；历史：钢架）','单位不同']);
+assert.deepEqual(splitPoints('L3500×H300mm；厚1.86mm'),['L3500×H300mm','厚1.86mm']);
+assert.equal(splitPoints('金属烤漆展示柜,\n热弯超白玻璃\n,上下发光灯箱').length,1);
+assert.equal(splitPoints('1.钢架\n2.板材（当前：铜；历史：钢）',{numbered:true}).length,2);
+assert.equal(splitPoints('规格(材料[铜；钢]；尺寸3500)。单位不同',{sentences:true}).length,2);
+console.log('5 semantic segmentation regressions passed');
