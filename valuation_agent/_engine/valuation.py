@@ -201,6 +201,11 @@ def reference(row, excluded):
         'source_scope', 'source_project_context', 'pricing_relationship',
         'exclude_from_procurement_price_comparison'
     )}
+    derivation = row.get('unit_price_derivation')
+    if isinstance(derivation, dict):
+        result['unit_price_derivation'] = {k: derivation[k] for k in
+            ('method', 'amount', 'quantity', 'unit', 'basis') if k in derivation}
+        result['source_unit_price_original'] = row.get('source_unit_price_original')
     attrs = row.get('source_attributes') or {}
     for field in ('quotation_variant_id', 'quotation_variant_name', 'parent_quote_variant',
                   'economic_purchase_group', 'purchase_evidence_group'):
