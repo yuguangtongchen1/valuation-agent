@@ -57,13 +57,20 @@ def original_document_url(row, record):
         for field in ('source_url', 'url'):
             if valid(attachment.get(field)):
                 return attachment[field]
-        kind = {12: 'file', 'file': 'file', 'docx': 'docx', 'doc': 'docs',
+        kind = {12: 'file', 22: 'docx', 'file': 'file', 'docx': 'docx', 'doc': 'docs',
                 'sheet': 'sheets', 'wiki': 'wiki'}.get(attachment.get('type'))
         if kind and re.fullmatch(r'[A-Za-z0-9]{16,64}', token):
             host = urlparse(TABLE_URL).hostname or 'www.feishu.cn'
             if not (host == 'www.feishu.cn' or host.endswith('.feishu.cn')):
                 host = 'www.feishu.cn'
             return f'https://{host}/{kind}/{token}'
+    # Embedded quotation images can use a different source ID from their contract.
+    evidence = (row.get('source_attributes') or {}).get('corroborating_contract_attachment') or {}
+    contract_token = evidence.get('source_token')
+    if (evidence.get('relation') == 'same_quote_visible_in_original_contract_embedded_media'
+            and evidence.get('source_locator') and contract_token != token
+            and any(a.get('token') == contract_token for a in record.get('attachments', []))):
+        return original_document_url({'source_token': contract_token}, record)
     for field in ('source_url', 'contract_url'):
         value = record.get(field)
         if valid(value) and (not token or urlparse(value).path.rstrip('/').split('/')[-1] == token):
