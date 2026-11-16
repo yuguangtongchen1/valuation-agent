@@ -46,12 +46,26 @@ def identities(value):
 def exclude_current_sources(rows, document):
     own=identities(document)
     for row in document.get('rows',[]):own.update(identities(row))
-    # Expand through provenance so old versions and alternate links cannot leak back.
-    while True:
-        expanded=set(own)
-        for row in rows:
-            ids=identities(row)
-            if ids & own:expanded.update(ids)
-        if expanded==own:break
-        own=expanded
-    return [r for r in rows if not identities(r)&own and r.get('is_current_version') is not False]
+    # Traverse the provenance graph once. Each source alias and row is visited
+    # at most once, including reverse-ordered chains of quotation revisions.
+    from collections import defaultdict, deque
+    by_identity = defaultdict(list)
+    row_identities = []
+    for index, row in enumerate(rows):
+        ids = identities(row)
+        row_identities.append(ids)
+        for identity in ids:
+            by_identity[identity].append(index)
+    queue = deque(own)
+    excluded = set()
+    while queue:
+        alias = queue.popleft()
+        for index in by_identity.pop(alias, ()):
+            if index in excluded:
+                continue
+            excluded.add(index)
+            for linked in row_identities[index] - own:
+                own.add(linked)
+                queue.append(linked)
+    return [row for index, row in enumerate(rows)
+            if index not in excluded and row.get('is_current_version') is not False]
