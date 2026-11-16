@@ -41,3 +41,13 @@ ID 应对应独立历史报价观察，不能用重复卡片充当样本。`judg
 
 ### 旋转平台子件实验（2026-11-16）
 真实服务对两条旋转平台及显式子件均返回零条；每轮扫描 6702 条价格索引，全部在语义筛选阶段排除。这不是库内不存在参考的证明。补充严格限定名称的钢构别名（钢结构框架、钢结构、钢架、钢架结构、钢架框架、钢骨架），与用途未明钢构归类对齐；不扩到屏体支撑、拆除或计算服务。子件仍不能代表整项价格。需待新版本部署后重复相同输入验证，不以合成用例替代真实召回评估。
+
+### Component provenance regression
+
+`test_real_gateway_component_lookup_excludes_source_family` runs the actual Gateway dispatch,
+reference pool, classification, and component lookup against a four-record fixture. A current
+file and its linked older quotation family are excluded before retrieval; another inactive
+version is excluded independently. Only the unrelated contract is returned, as a component
+reference with direct price comparison disabled. No matching function is mocked. This proves
+the seeded exclusion path, not real-corpus recall or browser acceptance. The focused suite
+now contains 12 passing tests.

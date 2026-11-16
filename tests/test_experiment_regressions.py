@@ -125,3 +125,38 @@ class ExperimentRegressions(unittest.TestCase):
                 refs = w.priced_references(Path('.'), [candidate(name)], ledger, {}, {},
                            {'name':'钢结构框架', 'currency':'CNY'}, component=('钢结构框架',(None,None)))
             self.assertEqual(refs, [], name)
+
+    def test_real_gateway_component_lookup_excludes_source_family(self):
+        """Exercise the real dispatch, pool, classification and component lookup."""
+        import tempfile
+        from valuation_agent.server import Gateway
+        def row(key, **identity):
+            return dict(kind='bom_line', source_fields_reviewed=True,
+                        record_status='line_fields_verified_price_scope_pending',
+                        record_id=key, line_id=key, source_token=key,
+                        item_name='钢结构', spec='定制', quantity=1, unit='项',
+                        unit_price=1000, subtotal=1000, currency='CNY',
+                        project_key=key, source_locator='报价表第1行', **identity)
+        rows = [row('own', quotation_family_id='family-a'),
+                row('old', quotation_family_id='family-a'),
+                row('inactive', is_current_version=False), row('independent')]
+        ledger = {r['record_id']: {'sheet':'2025', 'row':1, 'contract_name':'结构合同',
+                   'contract_link':'结构合同.pdf'} for r in rows}
+        quote = {'item_name':'旋转平台及装置', 'description':'内部钢结构框架',
+                 'quantity':1, 'unit':'项', 'subtotal':55120,
+                 'comparison_components':[{'name':'钢结构框架','source_text':'内部钢结构框架'}]}
+        with tempfile.TemporaryDirectory() as directory:
+            loaded = (modules(), Path(directory), rows, ledger, {}, {}, None, {})
+            app = Gateway(directory, Path(directory)/'unused', loader=lambda **kw:loaded)
+            try:
+                result = app.dispatch('compare', {'document': {
+                    'source_url':'https://tenant.feishu.cn/file/own?from=from_copylink',
+                    'rows':[quote]}})
+            finally:
+                app.executor.shutdown(wait=True)
+        refs = result['rows'][0]['references']
+        self.assertEqual([r['record_id'] for r in refs], ['independent'])
+        self.assertEqual(refs[0]['comparison_role'], 'component')
+        self.assertFalse(refs[0]['price_comparison_eligible'])
+        self.assertEqual(result['retrieval_corpus']['same_source_rows'], 2)
+        self.assertEqual(result['retrieval_corpus']['other_inactive_version_rows'], 1)
