@@ -1,8 +1,8 @@
-## 0.2.19 历史明细整行标黄
+## 0.2.20 历史明细整行标黄
 
 当前匹配的历史合同明细整行使用淡黄色，覆盖物料、规格、数量、单位和金额。CLI 内置完整界面、官网及专属安装入口同步更新。
 
-## 0.2.19 工作台可读性与语义分段修复
+## 0.2.20 工作台可读性与语义分段修复
 
 工艺、规格和参考差异统一使用括号保护分段；修复当前/历史对比误拆，删除侧栏待核线索，按贴合程度展示参考。发布包包含完整界面，Skill 同步更新。
 
@@ -32,7 +32,7 @@ macOS / Linux：
 
 ```sh
 python3 -m venv .valuation-env
-.valuation-env/bin/python -m pip install --upgrade 'valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.19'
+.valuation-env/bin/python -m pip install --upgrade 'valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.20'
 .valuation-env/bin/valuation-agent launch
 ```
 
@@ -40,7 +40,7 @@ Windows（PowerShell）：
 
 ```powershell
 py -m venv .valuation-env
-.\.valuation-env\Scripts\python.exe -m pip install --upgrade "valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.19"
+.\.valuation-env\Scripts\python.exe -m pip install --upgrade "valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.20"
 .\.valuation-env\Scripts\valuation-agent.exe launch
 ```
 
@@ -58,7 +58,7 @@ Python 3.9 或以上。建议使用独立环境：
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade 'valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.19'
+.venv/bin/python -m pip install --upgrade 'valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.20'
 .venv/bin/valuation-agent demo --output-dir ./demo-output
 ```
 
@@ -97,7 +97,7 @@ valuation-agent report ./comparison.json --out ./advice.md
 支持 JSON、UTF-8 CSV；安装可选依赖后支持 XLSX / XLS：
 
 ```sh
-python3 -m pip install "valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.19"
+python3 -m pip install "valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.20"
 valuation-agent import ./quotation.xlsx --worksheet 报价 --out ./quote.json
 ```
 
@@ -217,3 +217,9 @@ valuation-agent contract <检索返回的record_id> --remote /path/to/remote.jso
 0.2.10 恢复原版 React 工作台，撤除0.2.9简化主页面。首次激活后进入原版界面；原访问码继续有效，无需重新签发。飞书导入入口保留，实际读取需要使用者电脑另有飞书授权；仅访问码不授予飞书权限。
 
 0.2.11 接回原工作台的飞书导入。获授权的同事可接收管理员提供的单文件 Python 启动器并直接交给 Codex 运行。启动器包含个人访问码及启动说明，应单独转交。
+
+## 持续升级（0.2.20 起）
+
+以后沿用 `valuation-agent launch` 或原启动脚本即可：每次启动检查官方 `docs/latest.json`，在独立目录安装并验证新版后切换；运行中不自动重启。断网或安装失败继续使用已安装版。也可运行 `valuation-agent update` 提前准备升级。发布时必须更新此稳定版清单，且先验证对应 GitHub 标签可安装。
+
+0.2.19 及更早版没有更新器，须在原独立环境一次性升级到 0.2.20；不重新激活、不删除环境、不清浏览器数据。迁移首次启动使用原端口，例如 `launch --port 59067`，保留原 `--remote`、`--input` 和 `--worksheet`。后续记住端口；端口被占用时不杀其他进程、不悄悄换端口。访问码沿用原配置文件，续期权限不因升级延长。报价原文件和库不移动；浏览器报价仍保存在原浏览器、原地址的 IndexedDB，换浏览器/端口不能保证看到旧记录。升级前可导出报价备份。

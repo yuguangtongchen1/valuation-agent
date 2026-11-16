@@ -155,7 +155,13 @@ def make_handler(config,session_key,input_path=None,worksheet=None):
 
 def launch(config=None,port=0,no_browser=False,input_path=None,worksheet=None):
     handler=make_handler(config or default_config(),secrets.token_urlsafe(32),input_path,worksheet)
+    # Browser storage is origin-bound: keep the same port across releases.
+    origin_file=Path(config or default_config()).expanduser().with_name('workbench-port.json')
+    if not port and origin_file.exists():
+        port=int(json.loads(origin_file.read_text())['port'])
     server=HTTPServer(('127.0.0.1',port),handler)
+    origin_file.parent.mkdir(parents=True,exist_ok=True)
+    origin_file.write_text(json.dumps({'port':server.server_port}))
     url=f'http://127.0.0.1:{server.server_port}/'+('?handoff=1' if input_path else '')
     print('估价工作台已启动：'+url+'\n请保持此进程运行；关闭请按 Ctrl+C。',flush=True)
     if not no_browser:threading.Timer(0.5,lambda:webbrowser.open(url)).start()

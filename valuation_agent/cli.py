@@ -74,6 +74,7 @@ def main(argv=None):
     browser.add_argument("--remote", type=Path)
     browser.add_argument("--port", type=int, default=0)
     browser.add_argument("--no-browser", action="store_true")
+    commands.add_parser("update", help="安装官方最新版，保留访问配置与报价；下次启动生效")
     commands.add_parser("feishu-setup", help="检测并安装官方飞书 CLI 与 Skills，输出授权步骤")
     check = commands.add_parser("audit", help="只读校验 Data Hub 的项目、合同、原件与报价关联")
     check.add_argument("--data", type=Path, required=True)
@@ -145,7 +146,15 @@ def main(argv=None):
             activate(code,args.remote)
             print('访问已激活。运行 valuation-agent launch 打开操作界面。')
             return
+        if args.command == "update":
+            from .updater import prepare
+            selected = prepare()
+            print("升级检查完成；下次启动使用已准备版本。" if selected else "继续使用当前版本。")
+            return
         if args.command == "launch":
+            from .updater import launch_current
+            if launch_current(sys.argv[1:] if argv is None else argv):
+                return
             from .browser_app import launch
             launch(args.remote,args.port,args.no_browser,args.input,args.worksheet)
             return
