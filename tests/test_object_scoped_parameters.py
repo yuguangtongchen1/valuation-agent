@@ -52,3 +52,11 @@ class ObjectScopedParametersTests(unittest.TestCase):
         self.assertEqual(set(result), {'中文大标题字高', '英文大标题字高', '中文小文字字高'})
         self.assertEqual(list(result['英文大标题字高']), [85])
         self.assertEqual(list(result['中文小文字字高']), [51])
+
+    def test_english_lowercase_title_and_body_are_separate(self):
+        current = parameters('中文大标题字高430mm；英文大标题小写字高220mm；中文正文字高170mm；英文正文字高76mm')
+        history = parameters('中文大标题字高43cm；英文大标题小写字高22cm；中文正文字高17cm；英文正文字高8cm')
+        self.assertEqual(set(current), {'中文大标题字高', '英文大标题小写字高', '中文正文字高', '英文正文字高'})
+        compared = {r['label']: r for r in parameter_comparison(current, history)}
+        self.assertFalse(compared['英文大标题小写字高']['different'])
+        self.assertTrue(compared['英文正文字高']['different'])
