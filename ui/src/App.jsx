@@ -30,8 +30,9 @@ export default function App(){
     if(stopped)return;
     if(payload.revision&&payload.revision!==handoffRevision.current){
      const doc=payload.document,id=`codex:${payload.revision}`;
-     const q={id,projectName:doc.project||payload.filename,filename:payload.filename,supplierName:doc.supplier||'',sheet:'Codex',summaries:[],rows:[],lines:doc.rows.map((r,i)=>({
-      ...r,id:`${id}:${i}`,quoteId:id,row:i+1,name:String(r.item_name||''),description:String(r.description||r.configuration||''),dimensions:String(r.spec||''),spec:r.spec||'',model:r.model||'',configuration:r.configuration||'',
+     const projectId=doc.project_id||`unmapped:${id}`;
+     const q={id,projectId,projectName:doc.project||payload.filename,filename:payload.filename,supplierName:doc.supplier||'',sheet:'Codex',summaries:[],rows:[],lines:doc.rows.map((r,i)=>({
+      ...r,id:`${id}:${i}`,quoteId:id,projectId,row:i+1,name:String(r.item_name||''),description:String(r.description||r.configuration||''),dimensions:String(r.spec||''),spec:r.spec||'',model:r.model||'',configuration:r.configuration||'',
       quantity:r.quantity??null,unit:r.unit||'',standardUnit:r.unit||'',unitPrice:r.unit_price??null,amount:r.subtotal??null,derivedAmount:r.subtotal??null,currency:r.currency||'CNY',
       section:r.section||'',region:r.region||'',categoryId:'PENDING',calcErrors:[],priceStage:'quoted',sourceLocator:r.source_locator||null
      }))};

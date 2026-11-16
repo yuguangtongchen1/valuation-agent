@@ -28,3 +28,6 @@ The 13 targeted regression tests passed again. Release 0.2.21 is being prepared 
 The 87 source quotation rows have completed row-level text/image review. Four additional shared-image associations were restored after checking merged cells and object identity. This is review coverage, not a claim that every source specifies dimensions. Financial input fields were preserved.
 
 Parser regressions distinguish engraving depth from substrate thickness, and scope title/body, uppercase/lowercase, and numeric glyph heights separately. The 129-test suite passed before the version change. Public release, runtime synchronization and browser acceptance must be checked independently; this note does not claim deployment.
+
+## 0.2.22 旧报价兼容修复
+真实 Chrome 验收发现缺 projectId 的旧 handoff 记录导致 ImportDialog startsWith 崩溃。已保护导入筛选、规则列表和统计，并为新 handoff 明细补一致的未关联标识；未清空浏览器数据。Node 回归 3 项通过，87 条报价和远程历史明细已在原版界面显示。
