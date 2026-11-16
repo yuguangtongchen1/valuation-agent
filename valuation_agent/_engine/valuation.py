@@ -201,6 +201,15 @@ def reference(row, excluded):
         'source_scope', 'source_project_context', 'pricing_relationship',
         'exclude_from_procurement_price_comparison'
     )}
+    context = row.get('verified_billing_context')
+    if isinstance(context, dict):
+        allowed = ('physical_quantity', 'physical_unit', 'billing_quantity', 'billing_unit',
+                   'pricing_basis', 'fixed_total_cny', 'settlement_terms')
+        result['verified_billing_context'] = {k: context[k] for k in allowed
+            if k in context and isinstance(context[k], (str, int, float)) and not isinstance(context[k], bool)}
+        services = context.get('included_services')
+        if isinstance(services, list) and all(isinstance(v, str) for v in services):
+            result['verified_billing_context']['included_services'] = services
     derivation = row.get('unit_price_derivation')
     if isinstance(derivation, dict):
         result['unit_price_derivation'] = {k: derivation[k] for k in
