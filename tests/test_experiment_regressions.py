@@ -85,3 +85,19 @@ class ExperimentRegressions(unittest.TestCase):
         self.assertEqual(len(refs), 1)
         self.assertFalse(refs[0]['price_comparison_eligible'])
         self.assertEqual(refs[0]['source_review_kind'], 'line_fields_checked')
+
+    def test_zero_quantity_quote_keeps_price_with_explicit_status(self):
+        from unittest.mock import patch
+        w = modules()['workbench']
+        row = {'kind': 'bom_line', 'record_status': 'line_fields_verified_price_scope_pending',
+               'record_id': 'record', 'line_id': 'line', 'source_token': 'source',
+               'source_locator': 'row 1', 'item_name': '施工图绘制', 'unit': '项',
+               'quantity': '0.00', 'unit_price': 10000, 'subtotal': 0, 'currency': 'CNY'}
+        ledger = {'record': {'contract_name': '设计合同', 'sheet': '2025', 'row': 1,
+                             'contract_link': '设计合同.docx'}}
+        with patch.object(w, 'rejection', return_value=None), patch.object(w, 'reference', side_effect=lambda r, e: dict(r)):
+            refs = w.priced_references(Path('.'), [row], ledger, {}, {}, {'name': '施工图绘制', 'unit': '项', 'currency': 'CNY'})
+        self.assertEqual(len(refs), 1)
+        self.assertIn('零数量报价', refs[0]['match_kind'])
+        self.assertEqual(refs[0]['unit_price'], 10000)
+        self.assertFalse(refs[0]['price_comparison_eligible'])

@@ -16,7 +16,7 @@ from tempfile import TemporaryDirectory
 from urllib.parse import parse_qs, urlparse
 from zipfile import ZipFile
 
-from estimate import call, column
+from estimate import call, column, number
 from quote_classification import (billing_unit, bundled_evidence, comparable_class, process_reference, projection_purchase_role,
                                   process_terms, quote_classification)
 from quote_parameters import parameter_comparison, parameter_text_only, parameters, normalize_specification_text
@@ -688,6 +688,10 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
             label = '整包金额参考' if row.get('kind') == 'whole_scope_quote' else '明细金额参考'
             reason += '。历史仅提供范围金额，不作为当前分项单价或整项高低判断依据'
             differences.append('整包或明细总额与分项单价不可直接比较')
+        zero_quantity_quote = number(row.get('quantity')) == 0
+        if zero_quantity_quote:
+            label += ' · 零数量报价'
+            differences.append('原数量为0，成交执行范围未确认')
         if view_only_variant(row):
             label += ' · 版本范围待核'
             differences.append('历史版本或适用范围不同，不计作独立成交样本')
@@ -713,7 +717,7 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
                        'reference_billing_multiplier_label': multiplier_label,
                        'reference_total_cny_yuan': ref.get('subtotal_cny_yuan'),
                        'independent_sample_key': row.get('economic_purchase_group') or attrs.get('economic_purchase_group') or row.get('purchase_evidence_group') or attrs.get('purchase_evidence_group') or attrs.get('observation_family') or attrs.get('shared_quote_family') or row.get('project_key'),
-                       'price_comparison_eligible': is_checked(row) and not included_component and not package_total and not view_only_variant(row) and exclusion is None and not [d for d in differences if d != '币种不同'] and not component,
+                       'price_comparison_eligible': is_checked(row) and not zero_quantity_quote and not included_component and not package_total and not view_only_variant(row) and exclusion is None and not [d for d in differences if d != '币种不同'] and not component,
                        'match_reason': reason, 'parameters': compared,
                        'comparison_role': 'component' if included_component else 'package' if package_total else 'component' if component else 'package' if '整包旁证' in label else 'process' if '工艺' in label else 'partial' if '部分' in label or '交易或作业' in label else 'candidate',
                        'classification': classification,
