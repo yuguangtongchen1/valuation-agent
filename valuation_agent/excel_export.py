@@ -9,13 +9,31 @@ def number(value):
         return float(n) if n.is_finite()else None
     except InvalidOperation:return None
 
-def rate_basis(row):
+def derived_rate_basis(row):
     derivation = row.get('unit_price_derivation') or {}
     if derivation.get('method') not in ('subtotal_div_quantity', 'verified_original_amount_divided_by_billing_quantity'):
         return derivation.get('basis') or ''
     amount, quantity = derivation.get('amount'), derivation.get('quantity')
     unit = derivation.get('unit') or row.get('unit') or ''
     return f"计算单价：{amount}元 ÷ {quantity}{unit}" + (f"；{derivation['basis']}" if derivation.get('basis') else '')
+
+def rate_basis(row):
+    parts = [derived_rate_basis(row)]
+    context = row.get('verified_billing_context')
+    if isinstance(context, dict):
+        for prefix, label in (('physical', '实物数量'), ('billing', '计费数量')):
+            quantity, unit = context.get(prefix + '_quantity'), context.get(prefix + '_unit')
+            if quantity is not None and unit:
+                parts.append(f"{label}：{quantity}{unit}")
+        if context.get('fixed_total_cny') is not None:
+            parts.append(f"固定总额：{context['fixed_total_cny']}元")
+        for key in ('pricing_basis', 'settlement_terms'):
+            if context.get(key):
+                parts.append(str(context[key]))
+        services = context.get('included_services')
+        if isinstance(services, list) and services:
+            parts.append('包含：' + '、'.join(str(v) for v in services))
+    return '；'.join(dict.fromkeys(p for p in parts if p))
 
 def export_comparison(result,path):
     from openpyxl import Workbook

@@ -30,3 +30,20 @@ class RateBasisExport(unittest.TestCase):
             self.assertEqual(sheet.cell(2,9).value,10000)
             self.assertIsNone(sheet.cell(2,18).value)
             book.close()
+
+    def test_physical_quantity_does_not_replace_billing_quantity(self):
+        ref = dict(item_name='玻璃', currency='CNY', quantity=47, unit='平方米',
+                   unit_price=3085, subtotal=145000, verified_billing_context={
+                       'physical_quantity':18, 'physical_unit':'片',
+                       'billing_quantity':47, 'billing_unit':'平方米',
+                       'fixed_total_cny':145000, 'settlement_terms':'数量不变时按合同条件结算',
+                       'included_services':['包装','运输']})
+        with tempfile.TemporaryDirectory() as tmp:
+            path = export_comparison({'rows':[{'quote':{'item_name':'玻璃'},'references':[ref]}]}, Path(tmp)/'result.xlsx')
+            book = load_workbook(path)
+            sheet = book['历史参考']
+            self.assertEqual([sheet.cell(2,i).value for i in (6,7,8,9)], [47,'平方米',3085,145000])
+            basis = sheet.cell(2,18).value
+            for expected in ('实物数量：18片','计费数量：47平方米','固定总额：145000元','包含：包装、运输'):
+                self.assertIn(expected, basis)
+            book.close()
