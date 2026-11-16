@@ -1,4 +1,8 @@
-## 0.2.18 工作台可读性与语义分段修复
+## 0.2.19 历史明细整行标黄
+
+当前匹配的历史合同明细整行使用淡黄色，覆盖物料、规格、数量、单位和金额。CLI 内置完整界面、官网及专属安装入口同步更新。
+
+## 0.2.19 工作台可读性与语义分段修复
 
 工艺、规格和参考差异统一使用括号保护分段；修复当前/历史对比误拆，删除侧栏待核线索，按贴合程度展示参考。发布包包含完整界面，Skill 同步更新。
 
@@ -28,7 +32,7 @@ macOS / Linux：
 
 ```sh
 python3 -m venv .valuation-env
-.valuation-env/bin/python -m pip install --upgrade 'valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.18'
+.valuation-env/bin/python -m pip install --upgrade 'valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.19'
 .valuation-env/bin/valuation-agent launch
 ```
 
@@ -36,7 +40,7 @@ Windows（PowerShell）：
 
 ```powershell
 py -m venv .valuation-env
-.\.valuation-env\Scripts\python.exe -m pip install --upgrade "valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.18"
+.\.valuation-env\Scripts\python.exe -m pip install --upgrade "valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.19"
 .\.valuation-env\Scripts\valuation-agent.exe launch
 ```
 
@@ -54,7 +58,7 @@ Python 3.9 或以上。建议使用独立环境：
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade 'valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.18'
+.venv/bin/python -m pip install --upgrade 'valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.19'
 .venv/bin/valuation-agent demo --output-dir ./demo-output
 ```
 
@@ -93,7 +97,7 @@ valuation-agent report ./comparison.json --out ./advice.md
 支持 JSON、UTF-8 CSV；安装可选依赖后支持 XLSX / XLS：
 
 ```sh
-python3 -m pip install "valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.18"
+python3 -m pip install "valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.19"
 valuation-agent import ./quotation.xlsx --worksheet 报价 --out ./quote.json
 ```
 

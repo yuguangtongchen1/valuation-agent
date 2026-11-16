@@ -5,7 +5,7 @@ from pathlib import Path
 from .activation import parse_access_code
 
 # Versioned release shared by public and recipient-specific installers.
-RELEASE = "v0.2.18"
+RELEASE = "v0.2.19"
 
 def write_command(code, output, windows=False):
     parse_access_code(code)
