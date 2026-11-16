@@ -1,0 +1,13 @@
+.design-image-thumbnail{display:block;width:100%;padding:0;margin:10px 0;border:1px solid #d6e4de;border-radius:4px;background:#fff;cursor:zoom-in}
+.design-image-thumbnail img{display:block;max-width:100%;height:auto}
+.design-image-dialog{width:min(1200px,94vw);height:90vh;height:90dvh;max-width:94vw;max-height:94vh;padding:0;border:1px solid #cfddd6;border-radius:8px;background:#fff;color:#243448;box-shadow:0 16px 60px #0004}
+.design-image-dialog::backdrop{background:rgb(15 25 23 / 65%)}
+.design-image-dialog[open]{display:flex;flex-direction:column}
+.design-image-dialog header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #d6e4de}
+.design-image-dialog h2{margin:0;font-size:16px;overflow-wrap:anywhere}
+.design-image-controls{display:flex;gap:8px;flex-wrap:wrap}
+.design-image-controls button{min-height:40px;min-width:40px;padding:6px 12px;border:1px solid #bacfc3;border-radius:4px;background:#fff;color:#175d43;cursor:pointer}
+.design-image-controls button:disabled{opacity:.45;cursor:default}
+.design-image-thumbnail:focus-visible,.design-image-controls button:focus-visible{outline:3px solid #237653;outline-offset:3px}
+.design-image-viewport{flex:1;min-height:0;overflow:auto;padding:12px;background:#f5f7f6}
+.design-image-viewport img{display:block;max-width:none;height:auto;margin:auto;background:#fff}
