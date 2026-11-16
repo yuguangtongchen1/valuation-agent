@@ -1,0 +1,39 @@
+import unittest
+from pathlib import Path
+from valuation_agent.engine import modules
+
+class ExperimentRegressions(unittest.TestCase):
+    def test_parent_design_is_not_specific_deliverable(self):
+        w=modules()['workbench']
+        r=w.relationship({'name':'施工图深化设计','unit':'项'}, {'item_name':'深化设计','unit':'项','description':'展具深化、施工图节点、选材、现场设计指导'})
+        self.assertIsNotNone(r)
+        self.assertIn('上位服务范围',r[1])
+    def test_light_component_requires_source_evidence(self):
+        w=modules()['workbench']
+        q={'name':'定制圆环LED灯','description':'钢构铜饰面，内嵌4段圆环LED灯',
+           'comparison_components':[{'name':'LED灯','source_text':'圆环LED灯'}]}
+        self.assertIn(('LED灯',(None,None)),w.quoted_components(q))
+        q['description']='钢构铜饰面，不含圆环LED灯'
+        self.assertNotIn(('LED灯',(None,None)),w.quoted_components(q))
+    def test_whole_ring_is_not_strip(self):
+        w=modules()['workbench']
+        self.assertIsNone(w.relationship({'name':'可调圆形嵌入式LED灯'}, {'item_name':'LED灯带','unit':'米'}))
+    def test_suffix_dimension_axes_are_not_watts(self):
+        from valuation_agent._engine.quote_parameters import parameters
+        p=parameters('3000L×1800W')
+        self.assertNotIn('功率',p)
+        self.assertNotIn('宽',p)  # No invented length unit.
+        p=parameters('3000L×1800W mm；LED 18W')
+        self.assertEqual(list(p['宽']),[1800])
+        self.assertEqual(list(p['功率']),[18])
+        self.assertEqual(list(parameters('1.2kW')['功率']),[1200])
+    def test_share_url_excludes_token_and_version_family(self):
+        from valuation_agent.source_identity import exclude_current_sources
+        history=[{'source_token':'Abc123FileToken','quotation_family_id':'revision-a'},
+                 {'source_token':'OlderToken','quotation_family_id':'revision-a'},
+                 {'source_token':'IndependentSupplier','quotation_family_id':'revision-b'}]
+        kept=exclude_current_sources(history,{'source_url':'https://tenant.feishu.cn/file/Abc123FileToken?from=from_copylink','rows':[]})
+        self.assertEqual([r['source_token'] for r in kept],['IndependentSupplier'])
+        # A lookalike host must not establish a trusted token identity.
+        kept=exclude_current_sources(history,{'source_url':'https://feishu.cn.attacker.example/file/Abc123FileToken'})
+        self.assertEqual(len(kept),3)

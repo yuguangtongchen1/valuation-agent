@@ -1,5 +1,18 @@
 """Source identity shared by ingestion and comparison; never inferred from item names."""
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+import re
+
+
+def source_aliases(value):
+    """Join a Feishu share URL to its file token without guessing wiki targets."""
+    raw = canonical_source(value)
+    result = {('source', raw)}
+    parsed = urlsplit(raw)
+    if parsed.hostname and (parsed.hostname.endswith('.feishu.cn') or parsed.hostname.endswith('.larksuite.com')):
+        match = re.fullmatch(r'/(?:file|sheets|docx|docs|wiki|base)/([A-Za-z0-9]+)', parsed.path)
+        if match:
+            result.add(('source', match[1]))
+    return result
 
 
 def canonical_source(value):
@@ -20,10 +33,13 @@ def identities(value):
             raw=str(value[key])
             kind='source' if key in ('source_url','source_token') else key
             if raw.startswith('local-sha256:'):kind,raw='source_sha256',raw.split(':',1)[1]
-            result.add((kind,canonical_source(raw) if kind=='source' else raw))
+            if kind == 'source':
+                result.update(source_aliases(raw))
+            else:
+                result.add((kind, raw))
     evidence=value.get('source_evidence') or {}
     if evidence.get('sha256'):result.add(('source_sha256',str(evidence['sha256'])))
-    if evidence.get('url'):result.add(('source',canonical_source(evidence['url'])))
+    if evidence.get('url'):result.update(source_aliases(evidence['url']))
     return result
 
 

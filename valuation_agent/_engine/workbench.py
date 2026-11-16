@@ -30,6 +30,27 @@ YEARS = ('2024', '2025', '2026')
 DEMO_NAMES = ('三维动画', '三维渲染师', '制片')
 
 
+def original_document_url(row, record):
+    """Resolve an original document, never a guessed local cache path."""
+    for value in (row.get('source_url'), record.get('source_url'), record.get('contract_url')):
+        if isinstance(value, str):
+            parsed = urlparse(value)
+            if parsed.scheme == 'https' and parsed.hostname and not parsed.username and not parsed.password:
+                return value
+    token = str(row.get('source_token') or '')
+    attachment = next((a for a in record.get('attachments', []) if a.get('token') == token), None)
+    if not attachment or not re.fullmatch(r'[A-Za-z0-9]{16,64}', token):
+        return None
+    kind = {12: 'file', 'file': 'file', 'docx': 'docx', 'doc': 'docs',
+            'sheet': 'sheets', 'wiki': 'wiki'}.get(attachment.get('type'))
+    if not kind:
+        return None
+    host = urlparse(TABLE_URL).hostname or 'www.feishu.cn'
+    if not (host == 'www.feishu.cn' or host.endswith('.feishu.cn')):
+        host = 'www.feishu.cn'
+    return f'https://{host}/{kind}/{token}'
+
+
 def table_fallback(phrase):
     if not TABLE_URL:
         return [], False
@@ -451,6 +472,12 @@ def relationship(query, row, catalog_match=None):
         reason = '描述中有相同的材料或工艺，装置与工作范围需另核'
     else:
         return None
+    # A broader design service is not equivalent to its construction-drawing deliverable.
+    if '施工图' in str(query.get('name', '')) and '施工图' not in str(row.get('item_name', '')) and '深化设计' in str(row.get('item_name', '')):
+        tier = max(tier, 6)
+        label = '上位服务范围参考'
+        differences.append('服务范围较宽，未单列施工图费用')
+        reason = '深化设计可能包含施工图，但当前历史名称未单列施工图交付及费用；优先采用明确的施工图报价'
     if conflict:
         label += ' · 有差异'
     chain = ' → '.join(current_path)
@@ -505,14 +532,20 @@ def quoted_components(query):
     return list(components.items())
 
 
-def priced_references(root, checked, ledger, duplicates, shared, query, component=None, omit=(), catalog=None):
+def priced_references(root, checked, ledger, duplicates, shared, query, component=None, omit=(), catalog=None, trace=None):
     candidates = []
+    counts = {'query_object': query.get('name'), 'scope': 'component' if component else 'whole_item',
+              'rows_examined': 0, 'blocked_price_roles': 0, 'excluded_or_already_selected': 0,
+              'semantic_candidates': 0, 'duplicates_removed': 0, 'returned': 0}
     catalog_candidates = ({row['line_id']: (label, path) for row, label, path in catalog.candidates(query)}
                           if catalog and not component else {})
     for row in checked:
+        counts['rows_examined'] += 1
         if price_role_block(row):
+            counts['blocked_price_roles'] += 1
             continue
         if row['record_id'] == query.get('exclude') or row['line_id'] in omit:
+            counts['excluded_or_already_selected'] += 1
             continue
         if component:
             name, _ = component
@@ -522,15 +555,24 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
             current_concept, old_concept = concept(norm(name)), concept(past, str(row.get('description') or '') + ' ' + str(row.get('spec') or ''))
             semantic_related = bool(current_concept and old_concept and current_concept[0] == old_concept[0]
                                     and not re.search(r'[+＋]|整包|组合|套装|及|与', past))
-            if past != norm(name) and core != norm(name) and not related and not semantic_related:
+            # Broaden only an explicitly requested light source, never the whole fixture.
+            light_source_analogy = (norm(name) in ('led灯', 'led光源')
+                and bool(re.search(r'灯带|灯条|线性灯', past))
+                and bool(re.search(r'led|灯带|灯条', past + norm(row.get('spec'))))
+                and not re.search(r'控制|程序|更换|拆|回收|电源|变压器|结构|墙体|灯箱', past))
+            if past != norm(name) and core != norm(name) and not related and not semantic_related and not light_source_analogy:
                 continue
             label = '同名子件' if past == norm(name) else '同类子件' if semantic_related else '相近子件'
             component_relation = relationship({'name': name, 'unit': query.get('unit')}, row)
-            if component_relation is None and (current_concept or old_concept):
+            if component_relation is None and (current_concept or old_concept) and not light_source_analogy:
                 continue
             differences = list(component_relation[2]) if component_relation else []
             spec_differences = list(component_relation[3]) if component_relation else []
             reason = f'当前组合中的“{name}”检索到历史子件“{row["item_name"]}”；仅作部分参考，不代表整组报价'
+            if light_source_analogy:
+                label = '光源近似参考'
+                differences.append('仅LED发光部分近似；灯具形态、型材、钢构、饰面及控制配置未对齐')
+                reason = '按LED发光功能扩展到历史灯带或线性灯；只作光源选型线索，不代表定制环形灯具价格'
             relation = ((0 if past == norm(name) else 1, 0), label, differences, spec_differences,
                         reason, component_relation[5] if component_relation else [],
                         component_relation[6] if component_relation else None)
@@ -538,6 +580,7 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
             relation = relationship(query, row, catalog_candidates.get(row['line_id']))
         if relation:
             candidates.append((row, relation))
+    counts['semantic_candidates'] = len(candidates)
     current_unit = billing_unit(norm(query.get('unit')))
     query_path = line_classification(query, 'name', ('name', 'spec', 'description', 'configuration'))
     def family_distance(candidate):
@@ -551,6 +594,8 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
         label = relation[1]
         if any(term in label for term in ('工艺', '同材')):
             channel = 4
+        elif '上位服务范围' in label:
+            channel = 2
         elif '旁证' in label:
             channel = 3
         elif any(term in label for term in ('部分', '交易或作业')):
@@ -587,6 +632,7 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
         project = (row['project_key'], norm(row['item_name']), norm(row.get('spec')),
                    norm(row.get('model')), str(row.get('unit_price')), str(row.get('subtotal')), variant)
         if key in seen or project in projects:
+            counts['duplicates_removed'] += 1
             continue
         seen.add(key)
         projects.add(project)
@@ -605,8 +651,12 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
         multiplier_label = attrs.get('rate_multiplier_label') or row.get('rate_multiplier_label')
         rate_units = {'场次':('每场单价','场'), '天数':('每日单价','天'), '月数':('每月单价','月')}
         multiplier_rate = rate_units.get(multiplier_label) if multiplier is not None else None
-        if multiplier is not None:
-            differences.append('历史单价另乘' + str(multiplier_label or '计费倍数') + '，不等于完整工作量总价')
+        try:
+            has_multiplier = multiplier is not None and float(multiplier) != 1
+        except (TypeError, ValueError):
+            has_multiplier = multiplier is not None
+        if has_multiplier:
+            differences.append('历史单价另乘' + str(multiplier_label or '计费倍数') + '：' + str(multiplier))
         if monthly_fee is not None:
             differences.append('历史单价为每人月费用；整期小计单独保留，未注明月数不反推')
         if included_component:
@@ -635,8 +685,8 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
                        'match_kind': label, 'differences': list(dict.fromkeys(differences)), 'spec_differences': list(dict.fromkeys(spec_differences)),
                        'reference_price_type': 'package_total' if package_total else 'unit_price',
                        'reference_total': row.get('subtotal'),
-                       'reference_rate_basis': 'monthly_per_person' if monthly_fee is not None else 'source_multiplier_rate' if multiplier is not None else None,
-                       'reference_rate_label': '每人月费用' if monthly_fee is not None else multiplier_rate[0] if multiplier_rate else '原单价（另计倍数）' if multiplier is not None else None,
+                       'reference_rate_basis': 'monthly_per_person' if monthly_fee is not None else 'source_multiplier_rate' if multiplier_rate or has_multiplier else None,
+                       'reference_rate_label': '每人月费用' if monthly_fee is not None else multiplier_rate[0] if multiplier_rate else '计费倍数：' + str(multiplier) if has_multiplier else None,
                        'reference_rate_unit': '人/月' if monthly_fee is not None else str(row.get('unit') or '') + '·' + multiplier_rate[1] if multiplier_rate else None,
                        'reference_billing_multiplier': multiplier,
                        'reference_billing_multiplier_label': multiplier_label,
@@ -647,12 +697,16 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
                        'comparison_role': 'component' if included_component else 'package' if package_total else 'component' if component else 'package' if '整包旁证' in label else 'process' if '工艺' in label else 'partial' if '部分' in label or '交易或作业' in label else 'candidate',
                        'classification': classification,
                        'template_categories': template_context(catalog, row, 'item_name'),
-                       'source_url': f'{GITHUB}/attachments/{folder.name}/{source.name}' if GITHUB and source.is_file() else None})
+                       'source_url': original_document_url(row, record)})
         if component:
             result[-1].update(component_name=component[0], component_quantity=component[1][0],
                               component_unit=component[1][1])
         if len(result) == (1 if component else 6):
             break
+    counts['returned'] = len(result)
+    counts['return_limit'] = 1 if component else 6
+    if trace is not None:
+        trace.append(counts)
     return result
 
 
@@ -662,19 +716,21 @@ def lookup(root, checked, ledger, duplicates, shared, query, live, pending=None,
         return {'references': [], 'fallback_complete': True}
     path = line_classification(query, 'name', ('name', 'spec', 'description', 'configuration'))
     partials = []
+    search_trace = []
     for component in quoted_components({**query, 'name': name}):
         _, (_, unit) = component
         partials.extend(priced_references(root, checked, ledger, duplicates, shared,
                        {'name': component[0], 'unit': unit, 'currency': query.get('currency'),
-                        'exclude': query.get('exclude')}, component=component))
+                        'exclude': query.get('exclude')}, component=component, trace=search_trace))
     result = priced_references(root, checked, ledger, duplicates, shared, {**query, 'name': name},
-                               omit={ref['line_id'] for ref in partials}, catalog=catalog) + partials
+                               omit={ref['line_id'] for ref in partials}, catalog=catalog, trace=search_trace) + partials
     review_candidates = (pending or {}).get((path, billing_unit(norm(query.get('unit')))), {})
     if not path:
         path = next((match['classification']['current'] for match in result
                      if match.get('classification') and match['classification']['current']), ())
-    meta = {'input_issues': inspect_input(query), 'query_template_categories': template_context(catalog, query), 'retrieval_trace': {'stages': ['原件关联校验', '逐项功能与细类', '型号规格与组合拆解', '同层与父类候选扩展', '计价范围对照'], 'priced_rows_examined': len(checked), 'eligible_priced_history_complete': True, 'feishu_live_search_performed': bool(live and not result)},
+    meta = {'input_issues': inspect_input(query), 'query_template_categories': template_context(catalog, query), 'retrieval_trace': {'stages': ['原件关联校验', '逐项功能与细类', '型号规格与组合拆解', '同层与父类候选扩展', '计价范围对照'], 'priced_rows_examined': len(checked), 'eligible_priced_history_complete': False, 'coverage_basis': '遍历当前结构化价格索引；不代表原件图片已完整理解或相关证据全部召回', 'returned_reference_count': len(result), 'feishu_live_search_performed': bool(live and not result)},
             'query_classification': path,
+            'retrieval_passes': search_trace,
             'reviewed_price_rows': len(checked),
             'known_item_in_sources': any(rid != query.get('exclude') for rid in (source_names or {}).get(norm(name), ())),
             'pending_price_sources': [item for rid, item in review_candidates.items()

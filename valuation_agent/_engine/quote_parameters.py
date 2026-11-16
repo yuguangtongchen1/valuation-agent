@@ -49,7 +49,11 @@ def parameters(value, default_dimension_unit=''):
 @lru_cache(maxsize=32768)
 def _parameter_values(value, default_dimension_unit=''):
     # Some original dimension cells omit a separator between two labelled axes.
-    value = normalize_specification_text(value)
+    value = normalize_specification_text(value.lower())
+    # Suffix axes occur in drawings (3000L×1800W). Require a chain so a
+    # standalone 18W lamp rating cannot be mistaken for a width.
+    suffix_chain = rf'(?<![a-z0-9.]){NUMBER}\s*[lwh](?:\s*[x×*]\s*{NUMBER}\s*[lwh]){{1,2}}(?:\s*(?:{LENGTH_UNIT}))?(?![a-z0-9])'
+    value = re.sub(suffix_chain, lambda m: re.sub(rf'({NUMBER})\s*([lwh])', r'\2\1', m[0]), value)
     value = re.sub(r'(?<=\d)(?=[lwh]\s*[:=]?\s*\d)', '×', value)
     output = {}
     # An explicit unit at the end of an axis chain applies to the other axes in that chain.

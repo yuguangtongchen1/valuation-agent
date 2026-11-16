@@ -268,6 +268,8 @@ def read_input(path, worksheet=None):
         row = modules()["money"].normalize_money_fields(row, metadata)
         row = derive_unit_price(row)
         row = modules()["money"].normalize_money_fields(row, metadata)
+        from .completeness import assess
+        row["spec_completeness"] = assess(row)
         normalized.append(row)
     return {"schema_version": 1, "project": metadata.get("project", ""), "currency": metadata.get("currency", ""),
             "source_file": path.name, "source_sha256": digest, "worksheet": metadata.get('worksheet'), "synthetic": metadata.get("synthetic", False),
