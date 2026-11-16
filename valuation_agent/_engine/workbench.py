@@ -513,7 +513,8 @@ COMPONENT = re.compile(r'(?P<name>[\u4e00-\u9fff]{2,16})\s*[×xX*：:]?\s*'
                        r'(?P<quantity>\d+(?:\.\d+)?)\s*(?P<unit>个|件|只|套|组|台|盏|面|块)?')
 COMPONENT_VARIANT = re.compile(r'^(?:玻璃钢|亚克力|泡沫|不锈钢|木制|金属)|(?:造型|模型|道具|摆件)$')
 COMPONENT_TERMS = re.compile(r'帆船|塔灯|游泳圈|救生圈|指南针|船舵|舵轮|地球仪|礼帽|望远镜|铃铛|船锚|礼品盒|照相机|放大镜|五角星|圣诞球|星星灯|马灯|皮箱')
-COMPONENT_ALIASES = ({'船舵', '舵轮'}, {'游泳圈', '救生圈'})
+COMPONENT_ALIASES = ({'船舵', '舵轮'}, {'游泳圈', '救生圈'},
+                     {'钢结构框架', '钢结构', '钢架', '钢架结构', '钢架框架', '钢骨架'})
 
 
 def quoted_components(query):

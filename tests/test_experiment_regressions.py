@@ -101,3 +101,27 @@ class ExperimentRegressions(unittest.TestCase):
         self.assertIn('零数量报价', refs[0]['match_kind'])
         self.assertEqual(refs[0]['unit_price'], 10000)
         self.assertFalse(refs[0]['price_comparison_eligible'])
+
+    def test_structural_component_aliases_keep_scope_boundaries(self):
+        from unittest.mock import patch
+        w = modules()['workbench']
+        def candidate(name, **extra):
+            return dict(kind='bom_line', record_status='line_fields_verified_price_scope_pending',
+                        record_id='record', line_id=name, source_token='source', source_locator=name,
+                        item_name=name, unit='项', quantity=1, unit_price=1000, subtotal=1000,
+                        currency='CNY', **extra)
+        rows = [candidate('钢结构'), candidate('钢架'), candidate('钢架结构'),
+                candidate('大屏钢结构'), candidate('钢结构拆除'), candidate('钢结构计算费')]
+        ledger = {'record': {'contract_name': '结构合同', 'sheet': '2025', 'row': 1,
+                             'contract_link': '结构合同.docx'}}
+        with patch.object(w, 'rejection', return_value=None), patch.object(w, 'reference', side_effect=lambda r, e: dict(r)):
+            refs = w.priced_references(Path('.'), rows, ledger, {}, {},
+                       {'name':'钢结构框架', 'currency':'CNY'}, component=('钢结构框架',(None,None)))
+        self.assertTrue(refs)
+        self.assertIn(refs[0]['item_name'], ('钢结构','钢架','钢架结构'))
+        self.assertFalse(refs[0]['price_comparison_eligible'])
+        for name in ('大屏钢结构','钢结构拆除','钢结构计算费'):
+            with patch.object(w, 'rejection', return_value=None), patch.object(w, 'reference', side_effect=lambda r,e:dict(r)):
+                refs = w.priced_references(Path('.'), [candidate(name)], ledger, {}, {},
+                           {'name':'钢结构框架', 'currency':'CNY'}, component=('钢结构框架',(None,None)))
+            self.assertEqual(refs, [], name)
