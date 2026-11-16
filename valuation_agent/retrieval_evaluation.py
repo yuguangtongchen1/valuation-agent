@@ -29,6 +29,21 @@ def evaluate(cases, k=5):
         unique = list(dict.fromkeys(raw))
         top = unique[:k]
         hits = len(relevant.intersection(top))
+        # Scope labels are independent gold judgments, not inferred from wording.
+        expected_scopes = case.get('expected_scopes', {})
+        displayed_scopes = case.get('displayed_scopes', {})
+        allowed_scopes = {'comparable', 'package', 'component', 'lead', 'unrelated'}
+        if any(value not in allowed_scopes for value in list(expected_scopes.values()) + list(displayed_scopes.values())):
+            raise ValueError('unknown reference scope')
+        if not set(expected_scopes) <= judged:
+            raise ValueError('scope judgments must belong to judged_ids')
+        scope_checked = [item for item in top if item in expected_scopes]
+        scope_missing = [item for item in scope_checked if item not in displayed_scopes]
+        scope_wrong = [item for item in scope_checked if item in displayed_scopes
+                       and displayed_scopes[item] != expected_scopes[item]]
+        scope_overclaims = [item for item in scope_wrong
+                            if displayed_scopes[item] == 'comparable'
+                            and expected_scopes[item] != 'comparable']
         elapsed = case.get('elapsed_ms')
         if elapsed is not None:
             if isinstance(elapsed, bool) or not isinstance(elapsed, (int, float)) or not math.isfinite(elapsed) or elapsed < 0:
@@ -44,6 +59,10 @@ def evaluate(cases, k=5):
             'forbidden_at_k': len(set(top) & forbidden),
             'forbidden_anywhere': len(set(raw) & forbidden),
             'duplicate_results': len(raw) - len(unique),
+            'scope_judged_at_k': len(scope_checked),
+            'scope_missing_at_k': len(scope_missing),
+            'scope_wrong_at_k': len(scope_wrong),
+            'scope_overclaimed_ids': scope_overclaims,
             'empty_relevant_set_with_results': not relevant and bool(top),
         })
     def mean(field):
@@ -58,6 +77,10 @@ def evaluate(cases, k=5):
             'unjudged_at_k': sum(r['unjudged_at_k'] for r in results),
             'forbidden_anywhere': sum(r['forbidden_anywhere'] for r in results),
             'duplicate_results': sum(r['duplicate_results'] for r in results),
+            'scope_judged_at_k': sum(r['scope_judged_at_k'] for r in results),
+            'scope_missing_at_k': sum(r['scope_missing_at_k'] for r in results),
+            'scope_wrong_at_k': sum(r['scope_wrong_at_k'] for r in results),
+            'scope_overclaims': sum(len(r['scope_overclaimed_ids']) for r in results),
             'latency_samples': len(latencies), 'p50_ms': percentile(.5),
             'p95_ms': percentile(.95)}
 

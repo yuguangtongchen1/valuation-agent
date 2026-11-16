@@ -38,3 +38,20 @@ class RetrievalEvaluationTests(unittest.TestCase):
         report = evaluate(cases)
         self.assertEqual(report['p50_ms'], 10)
         self.assertEqual(report['p95_ms'], 19)
+
+    def test_component_recall_is_not_comparable_price_quality(self):
+        report = evaluate([{'query_id': 'ring-light', 'relevant_ids': ['strip'],
+            'retrieved_ids': ['strip', 'package'], 'judged_ids': ['strip', 'package'],
+            'expected_scopes': {'strip': 'component', 'package': 'package'},
+            'displayed_scopes': {'strip': 'comparable'}}])
+        self.assertEqual(report['macro_recall_at_k'], 1)
+        self.assertEqual(report['scope_overclaims'], 1)
+        self.assertEqual(report['scope_missing_at_k'], 1)
+        self.assertEqual(report['per_query'][0]['scope_overclaimed_ids'], ['strip'])
+
+    def test_scope_labels_require_explicit_valid_judgment(self):
+        base = {'query_id': 'x', 'relevant_ids': [], 'retrieved_ids': ['a']}
+        for extra in ({'expected_scopes': {'a': 'component'}},
+                      {'displayed_scopes': {'a': 'guessed'}}):
+            with self.assertRaises(ValueError):
+                evaluate([dict(base, **extra)])
