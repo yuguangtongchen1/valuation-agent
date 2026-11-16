@@ -16,7 +16,7 @@ macOS / Linux：
 
 ```sh
 python3 -m venv .valuation-env
-.valuation-env/bin/python -m pip install --upgrade 'valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.24'
+.valuation-env/bin/python -m pip install --upgrade 'valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.25'
 .valuation-env/bin/valuation-agent launch
 ```
 
@@ -24,7 +24,7 @@ Windows（PowerShell）：
 
 ```powershell
 py -m venv .valuation-env
-.\.valuation-env\Scripts\python.exe -m pip install --upgrade "valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.24"
+.\.valuation-env\Scripts\python.exe -m pip install --upgrade "valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.25"
 .\.valuation-env\Scripts\valuation-agent.exe launch
 ```
 
@@ -42,7 +42,7 @@ Python 3.9 或以上。建议使用独立环境：
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade 'valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.24'
+.venv/bin/python -m pip install --upgrade 'valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.25'
 .venv/bin/valuation-agent demo --output-dir ./demo-output
 ```
 
@@ -81,7 +81,7 @@ valuation-agent report ./comparison.json --out ./advice.md
 支持 JSON、UTF-8 CSV；安装可选依赖后支持 XLSX / XLS：
 
 ```sh
-python3 -m pip install "valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.24"
+python3 -m pip install "valuation-agent[excel] @ https://codeload.github.com/yuguangtongchen1/valuation-agent/zip/v0.2.25"
 valuation-agent import ./quotation.xlsx --worksheet 报价 --out ./quote.json
 ```
 
@@ -211,3 +211,9 @@ valuation-agent contract <检索返回的record_id> --remote /path/to/remote.jso
 ## 重建原版网页
 
 维护者在 `ui` 中运行 `npm ci`、`npm run build`，再在仓库根目录运行 `python3 scripts/package-ui.py`。构建只使用公开示例，不复制真实报价或访问配置。普通使用者无需 Node.js；CLI 包内提供构建后的完整工作台。
+
+### 供应商报价修订（0.2.25）
+
+同一供应商、项目和报价范围使用一个稳定报价编号，后台分别保留版本。默认启用新上传的报价；用户明确说明是旧版时，使用 `version_intent=historical` 仅归档。换链接的修改稿沿用 `quotation_family_id`，独立方案分别保留。
+
+用 `valuation-agent library versions --database <私有报价库路径>` 查看后台版本序号、来源与启用状态。默认导出仅当前版；当前报价及整个版本组不能作为自身比价依据。

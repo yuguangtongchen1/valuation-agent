@@ -246,3 +246,10 @@ AI 理解与候选复核由当前 Codex 完成；工作台通过服务器查询�
 
 ### 旧报价兼容验收
 升级后必须保留浏览器中的旧报价和复核记录。聊天导入记录可能没有 `projectId`：按未关联项目处理，不删除记录、不猜项目编号；检查首页、导入窗口和统计均能打开。新 handoff 记录给报价及其明细写入一致的未关联标识，避免旧数据导致整页崩溃。
+
+### 报价版本：默认最新上传，用户说明优先
+- 同一供应商、项目、报价范围沿用一个 `quotation_family_id`，前端保持同一报价编号。换链接也要沿用这个编号；可用经核实的 `supplier_id`、`project_id`、`quotation_scope_id` 自动生成。不同方案、区域不能误合并。
+- 默认 `version_intent=latest`：新内容入库即启用，旧版归档。用户说“上个版本”“上上个版本”“旧稿”等，解析为 `version_intent=historical`，保留用户原话为 `version_note`，只归档不覆盖当前报价。修订日期和序号保留为证据，不自动推翻用户规定的默认上传顺序。
+- 后台 `internal_version` 按每组入库顺序编号（1）、（2）等，它不是业务修订先后结论。前端报价编号不加版本后缀。相同内容重复导入不重新启用旧版。
+- 入库回读 `activation`；`activated` 表示启用，`historical_archived` 表示仅存档。版本列表命令：`valuation-agent library versions --database <私有目录>/supplier-quotes.sqlite`。
+- 当前报价比价时排除整个版本组。默认导出仅当前版，不把旧版作为额外样本。

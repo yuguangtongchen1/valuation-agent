@@ -38,7 +38,20 @@ def ingest(document, database):
         if r.get('parent_line_id') and r['parent_line_id'] not in ids:
             raise ValueError('组合子件的父行不存在')
     document = dict(document, source_url=canonical_source(document["source_url"]))
+    # These identifiers are assigned during source review, not fuzzy name matching.
+    scope_keys = ('supplier_id', 'project_id', 'quotation_scope_id')
+    if not document.get('quotation_family_id') and all(document.get(k) for k in scope_keys):
+        scope = json.dumps([str(document[k]).strip() for k in scope_keys], ensure_ascii=False)
+        document['quotation_family_id'] = 'scope:' + hashlib.sha256(scope.encode()).hexdigest()
     family = document.get("quotation_family_id") or document["source_url"]
+    # Explicit user revision intent overrides the default latest-upload policy.
+    intent = document.get('version_intent', 'latest')
+    if intent not in ('latest', 'historical'):
+        raise ValueError('version_intent 必须为 latest 或 historical')
+    sequence = document.get('revision_sequence')
+    if sequence is not None:
+        if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0:
+            raise ValueError('revision_sequence 必须为非负整数，来自已确认的修订顺序')
     payload = json.dumps(document, ensure_ascii=False, sort_keys=True)
     revision = hashlib.sha256(payload.encode()).hexdigest()
     path = Path(database); path.parent.mkdir(parents=True, exist_ok=True)
@@ -63,10 +76,16 @@ def ingest(document, database):
             row = dict(row, record_status='supplier_quotation', purchase_executed=False)
             db.execute('INSERT OR IGNORE INTO quote_lines VALUES(?,?,?,?,?)',
                        (revision,row['line_id'],row.get('supplier'),row['record_role'],json.dumps(row,ensure_ascii=False)))
-        if not existed:
+        activation = 'already_present' if existed else 'activated'
+        current = db.execute(
+            'SELECT v.payload FROM active_sources a JOIN quote_versions v ON v.revision=a.revision WHERE a.source_url=?',
+            (family,)).fetchone()
+        if not existed and intent == 'historical':
+            activation = 'historical_archived'
+        if not existed and activation == 'activated':
             db.execute('INSERT OR REPLACE INTO active_sources VALUES(?,?)',(family,revision))
     path.chmod(0o600)
-    return {'revision':revision,'rows':len(ids),'already_present':existed,'database':str(path.resolve())}
+    return {'revision':revision,'rows':len(ids),'already_present':existed,'activation':activation,'database':str(path.resolve())}
 
 
 def export(database, supplier=None, exclude_source=None, references_only=False):
@@ -104,3 +123,25 @@ def export(database, supplier=None, exclude_source=None, references_only=False):
     if references_only:
         rows = [r for r in rows if r.get('record_role') == 'quote_line' and r.get('comparable_price') is True]
     return {'rows':rows,'record_status':'supplier_quotation'}
+
+
+def list_versions(database):
+    """Read-only revision inventory; historical offers never enter default export."""
+    with sqlite3.connect('file:'+str(Path(database).resolve())+'?mode=ro', uri=True) as db:
+        active = {r for r, in db.execute('SELECT revision FROM active_sources')}
+        result = []
+        counters = {}
+        for revision, payload, created_at in db.execute(
+                'SELECT revision,payload,created_at FROM quote_versions ORDER BY rowid'):
+            doc = json.loads(payload)
+            family = doc.get('quotation_family_id') or doc['source_url']
+            counters[family] = counters.get(family, 0) + 1
+            result.append({'revision': revision, 'project': doc['project'],
+                           'quote_number': family, 'internal_version': counters[family],
+                           'version_intent': doc.get('version_intent', 'latest'),
+                           'source_url': doc['source_url'],
+                           'quotation_family_id': doc.get('quotation_family_id') or doc['source_url'],
+                           'revision_sequence': doc.get('revision_sequence'),
+                           'is_current_version': revision in active,
+                           'imported_at': created_at, 'rows': len(doc['rows'])})
+        return {'versions': result}

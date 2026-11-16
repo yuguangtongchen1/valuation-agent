@@ -2,7 +2,7 @@ import copy
 import tempfile
 import unittest
 from pathlib import Path
-from valuation_agent.quote_library import ingest, export, unit_price
+from valuation_agent.quote_library import ingest, export, unit_price, list_versions
 
 class QuoteLibraryTests(unittest.TestCase):
     def setUp(self):
@@ -23,6 +23,49 @@ class QuoteLibraryTests(unittest.TestCase):
         ingest(other,self.db)
         self.assertEqual(export(self.db)['rows'][0]['subtotal'],'120')
         self.assertEqual(export(self.db,exclude_source=self.doc['source_url'])['rows'],[])
+    def test_out_of_order_revision_keeps_latest(self):
+        self.doc.update(quotation_family_id='family', revision_sequence=3)
+        ingest(self.doc,self.db)
+        old=copy.deepcopy(self.doc)
+        old.update(source_url='https://example.test/old', revision_sequence=2, version_intent='historical')
+        old['rows'][0]['subtotal']='50'
+        self.assertEqual(ingest(old,self.db)['activation'],'historical_archived')
+        self.assertEqual(export(self.db)['rows'][0]['subtotal'],'100')
+        self.assertEqual(export(self.db,exclude_source=old['source_url'])['rows'],[])
+        old['revision_sequence']=4
+        old['version_intent']='latest'
+        self.assertEqual(ingest(old,self.db)['activation'],'activated')
+        self.assertEqual(export(self.db)['rows'][0]['subtotal'],'50')
+        versions=list_versions(self.db)['versions']
+        self.assertEqual(len(versions),3)
+        self.assertEqual(sum(v['is_current_version'] for v in versions),1)
+        self.assertEqual(next(v['revision_sequence'] for v in versions if v['is_current_version']),4)
+
+    def test_latest_upload_is_default_even_with_older_sequence(self):
+        self.doc['revision_sequence']=2
+        ingest(self.doc,self.db)
+        other=copy.deepcopy(self.doc);other['rows'][0]['subtotal']='500'
+        self.assertEqual(ingest(other,self.db)['activation'],'activated')
+        del other['revision_sequence']
+        self.assertEqual(ingest(other,self.db)['activation'],'activated')
+        self.assertEqual(export(self.db)['rows'][0]['subtotal'],'500')
+
+    def test_cross_link_scope_identity_and_distinct_alternative(self):
+        self.doc.update(supplier_id='s1', project_id='p1', quotation_scope_id='area-a', revision_sequence=1)
+        ingest(self.doc,self.db)
+        new=copy.deepcopy(self.doc)
+        new.update(source_url='https://example.test/new', revision_sequence=2)
+        new['rows'][0]['subtotal']='200'
+        ingest(new,self.db)
+        self.assertEqual([r['subtotal'] for r in export(self.db)['rows']],['200'])
+        alternative=copy.deepcopy(new)
+        alternative.update(quotation_scope_id='area-b', source_sha256='b'*64)
+        ingest(alternative,self.db)
+        self.assertEqual(len(export(self.db)['rows']),2)
+        rows=export(self.db,exclude_source=self.doc['source_url'])['rows']
+        # A shared file also links both scopes for self-source exclusion.
+        self.assertEqual(rows,[])
+
     def test_reference_export_requires_current_source(self):
         ingest(self.doc,self.db)
         with self.assertRaises(ValueError):export(self.db,references_only=True)
