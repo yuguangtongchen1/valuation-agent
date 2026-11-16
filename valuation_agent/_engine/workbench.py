@@ -30,6 +30,18 @@ YEARS = ('2024', '2025', '2026')
 DEMO_NAMES = ('三维动画', '三维渲染师', '制片')
 
 
+def quote_observation_key(row, variant=''):
+    """Collapse repeated observations only when product and billing scope agree."""
+    attrs = row.get('source_attributes') or {}
+    return (row.get('project_key'), norm(row.get('item_name')), norm(row.get('spec')),
+            norm(row.get('model')), norm(row.get('brand')), billing_unit(norm(row.get('unit'))),
+            str(row.get('quantity')), str(row.get('unit_price')), str(row.get('subtotal')),
+            row.get('currency'), row.get('kind'),
+            str(row.get('billing_multiplier') or row.get('price_multiplier')),
+            attrs.get('rate_multiplier_label') or row.get('rate_multiplier_label'),
+            str(attrs.get('monthly_fee_cny')), variant)
+
+
 def original_document_url(row, record):
     """Resolve an original document, never a guessed local cache path."""
     for value in (row.get('source_url'), record.get('source_url'), record.get('contract_url')):
@@ -629,8 +641,7 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
         attrs = row.get('source_attributes') or {}
         variant = str(row.get('quotation_variant_id') or attrs.get('quotation_variant_id') or row.get('source_variant_id') or row.get('variant_id') or row.get('source_price_version') or '')
         key = (row['source_token'], row['source_locator'], variant)
-        project = (row['project_key'], norm(row['item_name']), norm(row.get('spec')),
-                   norm(row.get('model')), str(row.get('unit_price')), str(row.get('subtotal')), variant)
+        project = quote_observation_key(row, variant)
         if key in seen or project in projects:
             counts['duplicates_removed'] += 1
             continue
