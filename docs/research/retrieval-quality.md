@@ -51,3 +51,14 @@ version is excluded independently. Only the unrelated contract is returned, as a
 reference with direct price comparison disabled. No matching function is mocked. This proves
 the seeded exclusion path, not real-corpus recall or browser acceptance. The focused suite
 now contains 12 passing tests.
+
+### Seating component recall finding
+
+A live `search 座椅` query returned historical `休闲座椅` (custom, per metre), while
+`环形座椅` as a source-backed component returned no candidates in the two-row comparison.
+The component prefilter used the narrower concept vocabulary and skipped the main taxonomy.
+Component retrieval now also uses `comparable_class`, with service-on-object exclusions
+(transport, removal, repair, rental and installation service). A positive seating regression
+and a negative seating-transport regression pass. Component references remain ineligible for
+whole-package price comparison. The local 112-test suite passed; this change still needs
+server deployment and live comparison before any claim of production improvement.

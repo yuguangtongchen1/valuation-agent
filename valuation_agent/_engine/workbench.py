@@ -555,6 +555,8 @@ def quoted_components(query):
 
 def priced_references(root, checked, ledger, duplicates, shared, query, component=None, omit=(), catalog=None, trace=None):
     candidates = []
+    component_path = (line_classification(query, 'name', ('name', 'spec', 'description'))
+                      if component else ())
     counts = {'query_object': query.get('name'), 'scope': 'component' if component else 'whole_item',
               'rows_examined': 0, 'blocked_price_roles': 0, 'excluded_or_already_selected': 0,
               'semantic_candidates': 0, 'duplicates_removed': 0, 'returned': 0}
@@ -578,7 +580,6 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
                 continue
             related = any(norm(name) in aliases and core in aliases for aliases in COMPONENT_ALIASES)
             current_concept, old_concept = concept(norm(name)), concept(past, str(row.get('description') or '') + ' ' + str(row.get('spec') or ''))
-            component_path = line_classification(query, 'name', ('name', 'spec', 'description'))
             candidate_path = line_classification(row, 'item_name', ('item_name', 'spec', 'description'))
             semantic_related = bool(
                 ((current_concept and old_concept and current_concept[0] == old_concept[0])
