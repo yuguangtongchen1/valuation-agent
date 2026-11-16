@@ -44,23 +44,31 @@ def quote_observation_key(row, variant=''):
 
 def original_document_url(row, record):
     """Resolve an original document, never a guessed local cache path."""
-    for value in (row.get('source_url'), record.get('source_url'), record.get('contract_url')):
-        if isinstance(value, str):
-            parsed = urlparse(value)
-            if parsed.scheme == 'https' and parsed.hostname and not parsed.username and not parsed.password:
-                return value
+    def valid(value):
+        if not isinstance(value, str):
+            return False
+        parsed = urlparse(value)
+        return parsed.scheme == 'https' and bool(parsed.hostname) and not parsed.username and not parsed.password
+    if valid(row.get('source_url')):
+        return row['source_url']
     token = str(row.get('source_token') or '')
     attachment = next((a for a in record.get('attachments', []) if a.get('token') == token), None)
-    if not attachment or not re.fullmatch(r'[A-Za-z0-9]{16,64}', token):
-        return None
-    kind = {12: 'file', 'file': 'file', 'docx': 'docx', 'doc': 'docs',
-            'sheet': 'sheets', 'wiki': 'wiki'}.get(attachment.get('type'))
-    if not kind:
-        return None
-    host = urlparse(TABLE_URL).hostname or 'www.feishu.cn'
-    if not (host == 'www.feishu.cn' or host.endswith('.feishu.cn')):
-        host = 'www.feishu.cn'
-    return f'https://{host}/{kind}/{token}'
+    if attachment:
+        for field in ('source_url', 'url'):
+            if valid(attachment.get(field)):
+                return attachment[field]
+        kind = {12: 'file', 'file': 'file', 'docx': 'docx', 'doc': 'docs',
+                'sheet': 'sheets', 'wiki': 'wiki'}.get(attachment.get('type'))
+        if kind and re.fullmatch(r'[A-Za-z0-9]{16,64}', token):
+            host = urlparse(TABLE_URL).hostname or 'www.feishu.cn'
+            if not (host == 'www.feishu.cn' or host.endswith('.feishu.cn')):
+                host = 'www.feishu.cn'
+            return f'https://{host}/{kind}/{token}'
+    for field in ('source_url', 'contract_url'):
+        value = record.get(field)
+        if valid(value) and (not token or urlparse(value).path.rstrip('/').split('/')[-1] == token):
+            return value
+    return None
 
 
 def table_fallback(phrase):
