@@ -13,12 +13,14 @@ const price = (value,currency,cny,archived=false) => cny!=null?`¥${money(cny)}`
 const title = value => (value||'相关台账记录').replace(/--.*\d{4}-\d{2}-\d{2}.*$/,'');
 const componentLabel = row => row.component_name ? `部分参考 · ${row.component_name}` : '';
 const readableReason = row => {
+ if(row.match_points?.length)return row.match_points;
  const category=row.classification?.historical?.at(-1);
  const basis=row.component_name?`匹配子件：${row.component_name}`:category?`按交付内容匹配：${category}`:'';
  const differences=(row.differences||[]).filter(d=>d!=='规格不同').flatMap(d=>splitPoints(d,{sentences:true})).map(d=>d.trim()).filter(d=>d&&!/不作为|仅保留|不代表|进一步比较|仅作|不能确认|不可直接比较/.test(d));
  return [...new Set([basis,...differences].filter(Boolean))];
 };
 const rankReferences = (rows,line) => {
+ if(rows.every(row=>Number.isFinite(row.match_rank)))return [...rows].sort((a,b)=>a.match_rank-b.match_rank);
  const unit=u=>({'m2':'㎡','平方米':'㎡','平方':'㎡','平米':'㎡','m':'米'}[u]||u||'');
  const rank=row=>[
   row.component_name?2:/上位|交易|旁证|工艺参考/.test(row.match_kind||'')?3:0,
@@ -35,10 +37,11 @@ const referenceAmount = row => {const view=referencePrice(row);return price(view
 const hasRateContext = row => Boolean(row.reference_rate_label||row.billing_period||row.period||Number(row.billing_multiplier||row.price_multiplier)>1);
 const variantId = row => row.quotation_variant_id||row.source_attributes?.quotation_variant_id||row.parent_quote_variant?.quotation_variant_id||row.parent_quote_variant?.id||'';
 export function PricePanel({line,onEvidence,observed}){
+ const [expanded,setExpanded]=useState(false);
  const [result,setResult]=useState(null),[failed,setFailed]=useState(false),[attempt,setAttempt]=useState(0);
  useEffect(()=>{
   const controller=new AbortController();
-  setResult(null);setFailed(false);
+  setResult(null);setFailed(false);setExpanded(false);
   api('lookup',lookupQuery(line),controller.signal).then(value=>{
    if(observed)observed.current[line.id]=value;
    setResult(value);
@@ -47,7 +50,7 @@ export function PricePanel({line,onEvidence,observed}){
  },[line,observed,attempt]);
  return <section className="attached-reference" aria-label={`${line.name}参考报价`}>
   <table><colgroup><col/><col className="reference-price-column"/></colgroup><thead><tr><th colSpan="2">历史参考报价</th></tr></thead><tbody>
-   {result?.references.length?rankReferences(result.references,line).map(row=>row.kind==='ledger_match'
+   {result?.references.length?rankReferences(result.references,line).slice(0,expanded?undefined:5).map(row=>row.kind==='ledger_match'
     ?<tr key={`${row.sheet}:${row.address}`}><td><a href={row.url} target="_blank" rel="noreferrer">{row.value||line.name}</a><small>{row.sheet} 台账 · {row.address}</small></td><td><small className="price-inline">无分项单价</small></td></tr>
     :<tr key={`${row.line_id}:${row.component_name||''}`}>
       <td>
@@ -69,6 +72,7 @@ export function PricePanel({line,onEvidence,observed}){
      {!!result?.query_classification?.length&&<small title={result.query_classification.join(' › ')}>{result.query_classification.slice(-2).join(' › ')}</small>}
     </td></tr>}
   </tbody></table>
+  {result?.references.length>5&&<button className="reference-retry" onClick={()=>setExpanded(value=>!value)}>{expanded?'收起':`展开其余 ${result.references.length-5} 条参考`}</button>}
  </section>;
 }
 export function EvidencePage({row,line,onBack}){
@@ -94,8 +98,8 @@ export function EvidencePage({row,line,onBack}){
    {referencePrice(row).packageTotal&&<div><dt>{referencePrice(row).componentNote?'子件金额注记':'整包参考'}</dt><dd>{referenceAmount(row)} · {referencePrice(row).componentNote?'子件金额注记，不是独立采购单价':'按原件整体范围记录，不拆成单价'}</dd></div>}
    {row.match_reason&&<div><dt>匹配依据</dt><dd>{row.match_reason}{row.component_name&&'。此价格仅参考该子件。'}</dd></div>}
    {row.classification&&<>
-    <div><dt>当前归类</dt><dd>{row.classification.current.join(' › ')||'待归类'}</dd></div>
-    <div><dt>历史归类</dt><dd>{row.classification.historical.join(' › ')||'待归类'}</dd></div>
+    <div><dt>当前归类</dt><dd>{(row.classification.current||[]).join(' › ')||'待归类'}</dd></div>
+    <div><dt>历史归类</dt><dd>{(row.classification.historical||[]).join(' › ')||'待归类'}</dd></div>
    </>}
    {!!row.spec_differences?.length&&<div><dt>当前规格</dt><dd>{[line.model,line.spec||line.dimensions,line.description,line.configuration].filter(Boolean).join(' · ')||'—'}</dd></div>}
    <div><dt>台账</dt><dd>{row.sheet} 年 · 含税人民币 {row.ledger_amount_cny_tax_inclusive||'未列'}</dd></div>

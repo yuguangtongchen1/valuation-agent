@@ -137,7 +137,7 @@ SCOPE_PARTS = {
     '设计': r'设计|策划', '制作': r'制作|加工|定制', '供货': r'供货|设备采购|购买|购置|网购|\bsupply\b|\bpurchase\b',
     '安装': r'安装|搭建|试搭|预搭', '调试': r'调试|测试', '运输': r'运输|运费',
     '拆除': r'拆除|撤场', '运维': r'运维|维护', '租赁': r'租赁|租用|租金|\brental\b|\brent\b|\bhire\b',
-    '建模': r'建模|模型制作', '绑定': r'绑定',
+    '报备': r'报备', '脚手架': r'脚手架', '建模': r'建模|模型制作', '绑定': r'绑定',
     '动画': r'动画', '渲染': r'渲染', '剪辑': r'剪辑', '特效': r'特效',
 }
 @lru_cache(maxsize=32768)
@@ -657,8 +657,21 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
         package = row.get('kind') == 'whole_scope_quote' or not (positive(row.get('unit_price')) and row.get('unit'))
         scope_distance = int(package and current_unit not in ('项','套','组',''))
         differences = [d for d in relation[2] if d != '币种不同']
-        return (channel, family_distance(candidate), scope_distance, unit_distance,
-                len(differences), len(relation[3]), relation[0],
+        current_materials = material_terms(' '.join(str(query.get(k) or '') for k in ('name','spec','description')))
+        past_materials = material_terms(' '.join(str(row.get(k) or '') for k in ('item_name','spec','description')))
+        overlap = len(set(current_materials) & set(past_materials))
+        construction = lambda text: set(re.findall(r'桁架|轻钢龙骨|石膏板|钢架|喷绘', text.replace('行架','桁架')))
+        requested_construction = construction(' '.join(str(query.get(k) or '') for k in ('name','spec','description','configuration')))
+        offered_construction = construction(' '.join(str(row.get(k) or '') for k in ('item_name','spec','description')))
+        # Extra services change the price basis even when the hardware matches.
+        service_terms = {'运输', '报备', '脚手架', '拆除', '安装'}
+        current_scope = ' '.join(str(query.get(k) or '') for k in ('name', 'description', 'configuration'))
+        past_scope = ' '.join(str(row.get(k) or '') for k in ('item_name', 'description', 'spec'))
+        extra_services = (scope_parts(past_scope)[0] - scope_parts(current_scope)[0]) & service_terms
+        construction_gap = len(requested_construction - offered_construction)
+        return (max(channel, 2 if package else 0), family_distance(candidate), scope_distance,
+                int('桁架' in requested_construction and '桁架' not in offered_construction), len(extra_services), construction_gap, -overlap, len(relation[3]), unit_distance, relation[0],
+                sum(not p.get('historical') for p in relation[5]), len(differences),
                 not bool(relation[6] and relation[6]['current'] == relation[6]['historical']),
                 norm(row.get('item_name')) != norm(query.get('name')),
                 row.get('currency') != query.get('currency'), str(row.get('line_id','')))
@@ -747,12 +760,10 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
         if component:
             result[-1].update(component_name=component[0], component_quantity=component[1][0],
                               component_unit=component[1][1])
-        if len(result) == (1 if component else 6):
-            break
     counts['returned'] = len(result)
     counts['candidates_beyond_return_limit'] = (len(candidates) - len(result)
         - counts['duplicates_removed'])
-    counts['return_limit'] = 1 if component else 6
+    counts['return_limit'] = None
     if trace is not None:
         trace.append(counts)
     return result
@@ -765,15 +776,27 @@ def lookup(root, checked, ledger, duplicates, shared, query, live, pending=None,
     if len(name) > 120:
         raise ValueError('物料名称超过 120 字；请把工艺、规格和项目背景放入独立字段')
     path = line_classification(query, 'name', ('name', 'spec', 'description', 'configuration'))
-    partials = []
     search_trace = []
+    # Whole-delivery evidence must not be consumed by a component pass.
+    result = priced_references(root, checked, ledger, duplicates, shared,
+                               {**query, 'name': name}, catalog=catalog, trace=search_trace)
+    seen_lines = {ref['line_id'] for ref in result}
     for component in quoted_components({**query, 'name': name}):
         _, (_, unit) = component
-        partials.extend(priced_references(root, checked, ledger, duplicates, shared,
+        partials = priced_references(root, checked, ledger, duplicates, shared,
                        {'name': component[0], 'unit': unit, 'currency': query.get('currency'),
-                        'exclude': query.get('exclude')}, component=component, trace=search_trace))
-    result = priced_references(root, checked, ledger, duplicates, shared, {**query, 'name': name},
-                               omit={ref['line_id'] for ref in partials}, catalog=catalog, trace=search_trace) + partials
+                        'exclude': query.get('exclude')},
+                       component=component, omit=seen_lines, trace=search_trace)
+        result.extend(partials)
+        seen_lines.update(ref['line_id'] for ref in partials)
+    # Preserve evidence distinctions while putting limited-scope analogies last.
+    result.sort(key=lambda ref: {'candidate': 0, 'package': 1, 'component': 2,
+                                'partial': 3, 'process': 4}.get(ref.get('comparison_role'), 3))
+    for position, ref in enumerate(result):
+        ref['match_rank'] = position + 1
+        common = f"匹配子项：{ref['component_name']}" if ref.get('component_name') else f"交付内容：{name} ↔ {ref['item_name']}"
+        ref['match_points'] = [common] + list(dict.fromkeys(
+            d for d in ref.get('differences', []) if d != '规格不同'))
     review_candidates = (pending or {}).get((path, billing_unit(norm(query.get('unit')))), {})
     if not path:
         path = next((match['classification']['current'] for match in result

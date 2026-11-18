@@ -4,7 +4,7 @@ import json
 import sqlite3
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
-from .source_identity import canonical_source, identities
+from .source_identity import canonical_source, exclude_current_sources
 
 
 def unit_price(amount, quantity, periods=None):
@@ -93,33 +93,41 @@ def export(database, supplier=None, exclude_source=None, references_only=False):
     if references_only and not exclude_source:
         raise ValueError('比价候选导出必须提供 --exclude-source 当前报价来源')
     with sqlite3.connect('file:'+str(Path(database).resolve())+'?mode=ro',uri=True) as db:
-        versions={revision:json.loads(payload) for revision,payload in db.execute('SELECT revision,payload FROM quote_versions ORDER BY rowid')}
-        active={revision for revision, in db.execute('SELECT revision FROM active_sources')}
-        current={}
-        for revision,doc in versions.items():
-            if revision in active:current[doc.get('quotation_family_id') or canonical_source(doc['source_url'])]=revision
-        active=set(current.values())
-        blocked={('source',canonical_source(exclude_source))} if exclude_source else set()
-        while True:
-            expanded=set(blocked)
-            for doc in versions.values():
-                ids=identities(doc)
-                if ids & blocked:expanded.update(ids)
-            if expanded==blocked:break
-            blocked=expanded
-        rows=[];seen=set()
-        for revision,payload in db.execute('SELECT revision,payload FROM quote_lines'):
-            doc=versions[revision]
-            if revision not in active or identities(doc)&blocked:continue
-            row=json.loads(payload)
-            if supplier and row.get('supplier')!=supplier:continue
-            key=(doc['source_sha256'],row['line_id'])
-            if key in seen:continue
-            seen.add(key)
-            rows.append(dict(row,source_url=doc['source_url'],source_sha256=doc['source_sha256'],
-                             quotation_family_id=doc.get('quotation_family_id') or doc['source_url'],
-                             economic_purchase_group=doc.get('quotation_family_id') or canonical_source(doc['source_url']),
-                             quote_revision=revision,is_current_version=True))
+        # Pin one read snapshot while imports may activate a newer revision.
+        db.execute('BEGIN')
+        versions = []
+        for revision, payload in db.execute(
+                "SELECT revision, json_remove(payload, '$.rows') FROM quote_versions ORDER BY rowid"):
+            versions.append(dict(json.loads(payload), revision=revision))
+        active = {revision for revision, in db.execute('SELECT revision FROM active_sources')}
+        current = {}
+        for doc in versions:
+            if doc['revision'] in active:
+                family = doc.get('quotation_family_id') or canonical_source(doc['source_url'])
+                current[family] = doc['revision']
+        active = set(current.values())
+        if exclude_source:
+            versions = exclude_current_sources(versions, {'source_url': exclude_source})
+        rows = []
+        seen = set()
+        for doc in versions:
+            revision = doc['revision']
+            if revision not in active:
+                continue
+            if supplier:
+                selected = db.execute('SELECT payload FROM quote_lines WHERE supplier=? AND revision=? ORDER BY rowid',
+                                      (supplier, revision))
+            else:
+                selected = db.execute('SELECT payload FROM quote_lines WHERE revision=? ORDER BY rowid', (revision,))
+            for payload, in selected:
+                row=json.loads(payload)
+                key=(doc['source_sha256'],row['line_id'])
+                if key in seen:continue
+                seen.add(key)
+                rows.append(dict(row,source_url=doc['source_url'],source_sha256=doc['source_sha256'],
+                                 quotation_family_id=doc.get('quotation_family_id') or doc['source_url'],
+                                 economic_purchase_group=doc.get('quotation_family_id') or canonical_source(doc['source_url']),
+                                 quote_revision=revision,is_current_version=True))
     if references_only:
         rows = [r for r in rows if r.get('record_role') == 'quote_line' and r.get('comparable_price') is True]
     return {'rows':rows,'record_status':'supplier_quotation'}
