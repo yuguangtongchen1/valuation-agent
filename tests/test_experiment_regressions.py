@@ -3,6 +3,15 @@ from pathlib import Path
 from valuation_agent.engine import modules
 
 class ExperimentRegressions(unittest.TestCase):
+    def test_wall_package_retrieves_primary_object_before_fittings(self):
+        workbench = modules()['workbench']
+        query = {'name': '多段弧形展墙', 'description': '顶面钢架、展台、橱窗',
+                 'comparison_components': [{'name': '顶面钢架', 'source_text': '顶面钢架'}]}
+        self.assertEqual(workbench.quoted_components(query),
+                         [('造型展墙', (None, None)), ('顶面钢架', (None, None))])
+        query['name'] = '顶面钢架'
+        self.assertNotIn(('造型展墙', (None, None)), workbench.quoted_components(query))
+
     def test_parent_design_is_not_specific_deliverable(self):
         w=modules()['workbench']
         r=w.relationship({'name':'施工图深化设计','unit':'项'}, {'item_name':'深化设计','unit':'项','description':'展具深化、施工图节点、选材、现场设计指导'})

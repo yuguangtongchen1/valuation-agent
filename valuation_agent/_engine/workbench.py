@@ -532,6 +532,11 @@ def quoted_components(query):
     # Codex may interpret nonstandard prose, but each explicit component needs an
     # exact source span. This is candidate scope, never an allocated component price.
     evidence = ' '.join(str(query.get(k) or '') for k in ('description','configuration','source_description_unabridged'))
+    # Preserve the primary construction object when fittings broaden the package.
+    primary = concept(query['name'])
+    combined = concept(query['name'], evidence)
+    if primary and combined and primary[0] == 'display_wall' and combined[0] == 'fitout_package':
+        components['造型展墙'] = (None, None)
     for part in query.get('comparison_components') or []:
         if not isinstance(part, dict):
             continue
@@ -753,7 +758,7 @@ def priced_references(root, checked, ledger, duplicates, shared, query, componen
                        'independent_sample_key': row.get('economic_purchase_group') or attrs.get('economic_purchase_group') or row.get('purchase_evidence_group') or attrs.get('purchase_evidence_group') or attrs.get('observation_family') or attrs.get('shared_quote_family') or row.get('project_key'),
                        'price_comparison_eligible': is_checked(row) and not zero_quantity_quote and not included_component and not package_total and not view_only_variant(row) and exclusion is None and not [d for d in differences if d != '币种不同'] and not component,
                        'match_reason': reason, 'parameters': compared,
-                       'comparison_role': 'component' if included_component else 'package' if package_total else 'component' if component else 'package' if '整包旁证' in label else 'process' if '工艺' in label else 'partial' if '部分' in label or '交易或作业' in label else 'candidate',
+                       'comparison_role': 'component' if included_component else 'component' if component else 'package' if package_total else 'package' if '整包旁证' in label else 'process' if '工艺' in label else 'partial' if '部分' in label or '交易或作业' in label else 'candidate',
                        'classification': classification,
                        'template_categories': template_context(catalog, row, 'item_name'),
                        'source_url': original_document_url(row, record)})
