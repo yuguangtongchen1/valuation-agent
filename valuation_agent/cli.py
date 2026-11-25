@@ -12,6 +12,21 @@ from .reports import render
 from .service import audit, classify, compare, search
 
 
+def delivery_name(row):
+    explicit = str(row.get('retrieval_name') or '').strip()
+    if explicit:
+        return explicit
+    name = row.get('item_name', '')
+    description = row.get('description') or ''
+    if '运输' in name and '货车' in description:
+        return '货车运输'
+    if '包装' in name and '包装费' in description:
+        return '包装费'
+    if '音响' in name and any(word in description for word in ('雕刻', '裱画', '异形边喷漆')):
+        return '音响造型展示道具'
+    return ''
+
+
 def remote_compare(document,config):
     from .remote import remote_call
     if not document['rows'] or len(document['rows'])>1000:raise ValueError('远程比价每份支持1至1000条，请拆分。')
@@ -26,6 +41,33 @@ def remote_compare(document,config):
         identities=[{k:r[k] for k in identity_fields if r.get(k)} for r in [document]+document['rows']]
         identities=list({json.dumps(x,sort_keys=True):x for x in identities if x}.values())
         part=remote_call('compare',{'document':{'project':document.get('project',''),'rows':rows,'exclusion_sources':identities}},config)
+        primary = part.get('rows', [])
+        if len(primary) != len(rows):
+            raise ValueError('远程比价回执缺行')
+        variants = []
+        for index, original in enumerate(document['rows'][start:start+20]):
+            name = delivery_name(original)
+            if name and name != rows[index]['item_name']:
+                variants.append((index, dict(rows[index], item_name=name)))
+        if variants:
+            extra = remote_call('compare', {'document': {'project': document.get('project', ''),
+                'rows': [row for _, row in variants], 'exclusion_sources': identities}}, config)
+            if len(extra.get('rows', [])) != len(variants) or extra.get('history') != part.get('history'):
+                raise ValueError('扩展比价回执不完整或历史库已更新，请重试')
+            for (index, query), found in zip(variants, extra['rows']):
+                target = primary[index]
+                target['delivery_lookup'] = query['item_name']
+                def evidence_key(ref):
+                    return (ref.get('record_id'), ref.get('line_id') or ref.get('source_locator'), ref.get('item_name'))
+                seen = {evidence_key(ref) for ref in target.get('references', [])}
+                for ref in found.get('references', []):
+                    key = evidence_key(ref)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    candidate = dict(ref, comparison_role='candidate', price_comparison_eligible=False,
+                        match_kind='扩展候选 · 待核交付范围')
+                    target.setdefault('references', []).append(candidate)
         # Older remote engines may promote unrelated rows solely due to scope warnings.
         # Recheck those candidates with the same object-relevance rule used locally.
         from .engine import modules

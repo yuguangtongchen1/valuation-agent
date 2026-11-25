@@ -37,11 +37,10 @@ const referenceAmount = row => {const view=referencePrice(row);return price(view
 const hasRateContext = row => Boolean(row.reference_rate_label||row.billing_period||row.period||Number(row.billing_multiplier||row.price_multiplier)>1);
 const variantId = row => row.quotation_variant_id||row.source_attributes?.quotation_variant_id||row.parent_quote_variant?.quotation_variant_id||row.parent_quote_variant?.id||'';
 export function PricePanel({line,onEvidence,observed}){
- const [expanded,setExpanded]=useState(false);
  const [result,setResult]=useState(null),[failed,setFailed]=useState(false),[attempt,setAttempt]=useState(0);
  useEffect(()=>{
   const controller=new AbortController();
-  setResult(null);setFailed(false);setExpanded(false);
+  setResult(null);setFailed(false);
   api('lookup',lookupQuery(line),controller.signal).then(value=>{
    if(observed)observed.current[line.id]=value;
    setResult(value);
@@ -50,7 +49,7 @@ export function PricePanel({line,onEvidence,observed}){
  },[line,observed,attempt]);
  return <section className="attached-reference" aria-label={`${line.name}参考报价`}>
   <table><colgroup><col/><col className="reference-price-column"/></colgroup><thead><tr><th colSpan="2">历史参考报价</th></tr></thead><tbody>
-   {result?.references.length?rankReferences(result.references,line).slice(0,expanded?undefined:5).map(row=>row.kind==='ledger_match'
+   {result?.references.length?rankReferences(result.references,line).map(row=>row.kind==='ledger_match'
     ?<tr key={`${row.sheet}:${row.address}`}><td><a href={row.url} target="_blank" rel="noreferrer">{row.value||line.name}</a><small>{row.sheet} 台账 · {row.address}</small></td><td><small className="price-inline">无分项单价</small></td></tr>
     :<tr key={`${row.line_id}:${row.component_name||''}`}>
       <td>
@@ -72,7 +71,6 @@ export function PricePanel({line,onEvidence,observed}){
      {!!result?.query_classification?.length&&<small title={result.query_classification.join(' › ')}>{result.query_classification.slice(-2).join(' › ')}</small>}
     </td></tr>}
   </tbody></table>
-  {result?.references.length>5&&<button className="reference-retry" onClick={()=>setExpanded(value=>!value)}>{expanded?'收起':`展开其余 ${result.references.length-5} 条参考`}</button>}
  </section>;
 }
 export function EvidencePage({row,line,onBack}){
@@ -101,7 +99,7 @@ export function EvidencePage({row,line,onBack}){
     <div><dt>当前归类</dt><dd>{(row.classification.current||[]).join(' › ')||'待归类'}</dd></div>
     <div><dt>历史归类</dt><dd>{(row.classification.historical||[]).join(' › ')||'待归类'}</dd></div>
    </>}
-   {!!row.spec_differences?.length&&<div><dt>当前规格</dt><dd>{[line.model,line.spec||line.dimensions,line.description,line.configuration].filter(Boolean).join(' · ')||'—'}</dd></div>}
+   {!!row.spec_differences?.length&&<div><dt>当前规格</dt><dd>{[...new Set([line.model,line.spec||line.dimensions,line.configuration].filter(Boolean))].join(' · ')||'—'}</dd></div>}
    <div><dt>台账</dt><dd>{row.sheet} 年 · 含税人民币 {row.ledger_amount_cny_tax_inclusive||'未列'}</dd></div>
    <div><dt>合同原件</dt><dd>{originalLink(row)?<a href={originalLink(row)} target="_blank" rel="noopener noreferrer">{row.source_name||'打开合同原件'} ↗</a>:<span>{row.source_name||'合同原件'}（原件链接待补）</span>}</dd></div>
   </dl>

@@ -16,7 +16,7 @@ export async function api(action, params = {}, signal) {
 export const lookupQuery = line => ({
  spec_status:line.spec_review?.status==='source_conflict'?'source_conflict':line.spec_completeness?.status,
  source_url:line.source_url,source_token:line.source_token,source_sha256:line.source_sha256||line.source_evidence?.sha256,quotation_family_id:line.quotation_family_id,economic_purchase_group:line.economic_purchase_group,comparison_components:line.comparison_components,
- name:line.name,quantity:String(line.quantity??''),exclude:line.sourceRecordId||'',unit:line.unit||'',
+ name:line.name,retrieval_name:line.retrieval_name,quantity:String(line.quantity??''),exclude:line.sourceRecordId||'',unit:line.unit||'',
  currency:line.currency||'CNY',model:line.model||'',spec:line.spec??line.dimensions??'',configuration:line.configuration||'',
  dimension_unit:line.dimensionUnit??(line.spec==null?'mm':''),
  description:(line.description||'').slice(0,6000)
